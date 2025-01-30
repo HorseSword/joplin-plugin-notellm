@@ -17,41 +17,72 @@ joplin.plugins.register({
 		/**
 		 * 获取选中片段前面、中间、后面
 		 */
-		async function split_note_by_selection(split:string='@TODO') {
+		async function split_note_by_selection(split_char:string='@TODO') {
 			let is_selection_exists = false;
-			let content = await joplin.commands.execute('editor.execCommand', {
+			let content:string = await joplin.commands.execute('editor.execCommand', {
 				name: 'getValue',
-			}); // 获取文档内容
-			let lines = content.split('\n'); // 按行分割文档内容
-			//
-			// 选中部分
-			const selectedText = await joplin.commands.execute('selectedText');
-			
-			if (!selectedText || selectedText.trim() === '') { // 如果没有选中内容
-				is_selection_exists = false;
+			}); // 获取文档内容 // 这种写法在手机端不兼容
+			if (typeof content ==='string'){
+				let lines = content.split('\n'); // 按行分割文档内容
+				//
+				// 选中部分
+				const selectedText = await joplin.commands.execute('selectedText');
+				
+				if (!selectedText || selectedText.trim() === '') { // 如果没有选中内容
+					is_selection_exists = false;
+				}
+				else{
+					is_selection_exists = true;
+				}
+				//
+				// 选中前面部分
+				let selectionStart = await joplin.commands.execute('editor.execCommand', {
+					name: 'getCursor',
+					args: ['from'],
+				}); // 获取选中起点光标位置
+				let beforeSelection = lines.slice(0, selectionStart.line).join('\n') + '\n' + lines[selectionStart.line].slice(0, selectionStart.ch);
+				//
+				// 选中后面部分
+				let selectionEnd = await joplin.commands.execute('editor.execCommand', {
+					name: 'getCursor',
+					args: ['to'],
+				}); // 获取选中结束光标位置
+				let afterSelection = lines[selectionEnd.line].slice(selectionEnd.ch) + '\n' + lines.slice(selectionEnd.line + 1).join('\n');
+				//
+				return {is_selection_exists:is_selection_exists, 
+					str_before:beforeSelection, 
+					str_selected: selectedText, 
+					str_after:afterSelection
+				}
 			}
 			else{
-				is_selection_exists = true;
-			}
-			//
-			// 选中前面部分
-			let selectionStart = await joplin.commands.execute('editor.execCommand', {
-				name: 'getCursor',
-				args: ['from'],
-			}); // 获取选中起点光标位置
-			let beforeSelection = lines.slice(0, selectionStart.line).join('\n') + '\n' + lines[selectionStart.line].slice(0, selectionStart.ch);
-			//
-			// 选中后面部分
-			let selectionEnd = await joplin.commands.execute('editor.execCommand', {
-				name: 'getCursor',
-				args: ['to'],
-			}); // 获取选中结束光标位置
-			let afterSelection = lines[selectionEnd.line].slice(selectionEnd.ch) + '\n' + lines.slice(selectionEnd.line + 1).join('\n');
-			//
-			return {is_selection_exists:is_selection_exists, 
-				str_before:beforeSelection, 
-				str_selected: selectedText, 
-				str_after:afterSelection
+				let tmp_note = await joplin.workspace.selectedNote()
+				let content = tmp_note.body // 移动端兼容写法
+				let lines = content.split('\n'); // 按行分割文档内容
+				//
+				// 选中部分
+				const selectedText = await joplin.commands.execute('selectedText');
+				
+				if (!selectedText || selectedText.trim() === '') { // 如果没有选中内容
+					is_selection_exists = false;
+				}
+				else{
+					is_selection_exists = true;
+				}
+				//
+				// 选中前面部分
+				let beforeSelection = content;
+				if (is_selection_exists){
+					beforeSelection = '';
+				}
+				//
+				// 选中后面部分
+				let afterSelection = ''
+				return {is_selection_exists:is_selection_exists, 
+					str_before:beforeSelection, 
+					str_selected: selectedText, 
+					str_after:afterSelection
+				}
 			}
 		}
 		interface OneMessage {
@@ -165,14 +196,21 @@ joplin.plugins.register({
 			const decoder = new TextDecoder('utf-8');
 			//
 			// 光标移动到选区最末尾
-			let selectionEnd = await joplin.commands.execute('editor.execCommand', {
-				name: 'getCursor',
-				args: ['to'],
-			}); 
-			await joplin.commands.execute('editor.execCommand', {
-				name: 'setCursor',
-				args: [selectionEnd]
-			});
+			try{
+				let selectionEnd = await joplin.commands.execute('editor.execCommand', {
+					name: 'getCursor',
+					args: ['to'],
+				}); 
+				await joplin.commands.execute('editor.execCommand', {
+					name: 'setCursor',
+					args: [selectionEnd]
+				});
+			}
+			catch{ // 移动端不兼容的情况下
+				if (is_selection_exists) { // 如果有选中内容
+					await joplin.commands.execute('insertText', `${inp_str}`);
+				}
+			}
 			//
 			// 打印 chat_head
 			let result = `\n\n**${chat_head}**\n`;
@@ -197,7 +235,7 @@ joplin.plugins.register({
 						args: [tmp_pos_cursor],
 					});							
 				}
-				else if (mode == 'mobile'){
+				else if (mode === 'mobile'){
 					// if(query_type=='chat' && !is_selection_exists){
 					// 	await joplin.commands.execute('editor.execCommand',{
 					// 		name:'scrollToLine',
@@ -219,56 +257,61 @@ joplin.plugins.register({
 				if (done) break; // 流结束时退出循环
 
 				// 解码并解析数据块
-				const chunk = decoder.decode(value, { stream: true });
+				const chunk:string = decoder.decode(value, { stream: true });
 				console.info('Stream Chunk:', chunk);
 
 				// 解析 JSON 行
-				for (const line of chunk.split('\n')) {
-					const trimmedLine = line.trim();
-					// 忽略空行或无效行
-					if (!trimmedLine || !trimmedLine.startsWith('data:')) {
-						continue;
-					}
-
-					// 处理 "data:" 前缀
-					const jsonString = trimmedLine.replace(/^data: /, ''); // 去掉 "data: " 前缀
-
-					// 特殊情况：处理流结束的标志 "data: [DONE]"
-					if (jsonString === '[DONE]') {
-						console.info('Stream finished.');
-						break;
-					}
-
-					try {
-						// 解析 JSON 数据
-						const parsed = JSON.parse(jsonString);
-						const content = parsed.choices[0]?.delta?.content || '';
-						output_str+=content;
-						if(need_add_head){
-							if (output_str.length>10 && !output_str.trim().startsWith('**')){  // 肯定不是重复出现
-								await insertContentToNote(output_str);
-								need_add_head = false;
-							}
-							else if(output_str.length>(5 + `**${chat_head}**`.length) ){
-								if(output_str.trim().startsWith(`**${chat_head}**`)){  // 
-									output_str = output_str.replace(`**${chat_head}**`,''); // 避免重复出现
-									await insertContentToNote(output_str);
-								}
-								else{
-									await insertContentToNote(output_str);
-								}
-								need_add_head = false;
-							}
+				if (typeof chunk === "string"){
+					for (const line of chunk.split('\n')) { //
+						const trimmedLine = line.trim();
+						// 忽略空行或无效行
+						if (!trimmedLine || !trimmedLine.startsWith('data:')) {
+							continue;
 						}
-						else{
-							await insertContentToNote(content); // 实时更新内容
+	
+						// 处理 "data:" 前缀
+						const jsonString = trimmedLine.replace(/^data: /, ''); // 去掉 "data: " 前缀
+	
+						// 特殊情况：处理流结束的标志 "data: [DONE]"
+						if (jsonString === '[DONE]') {
+							console.info('Stream finished.');
+							break;
 						}
-						// 滚动条移动到光标位置
-						await scroll_to_view(platform);
-					} catch (err) {
-						console.warn('Failed to parse line:', trimmedLine, err);
-						alert(`Failed to parse line: ${err}`);
+	
+						try {
+							// 解析 JSON 数据
+							const parsed = JSON.parse(jsonString);
+							const content = parsed.choices[0]?.delta?.content || '';
+							output_str+=content;
+							if(need_add_head){
+								if (output_str.length>10 && !output_str.trim().startsWith('**')){  // 肯定不是重复出现
+									await insertContentToNote(output_str);
+									need_add_head = false;
+								}
+								else if(output_str.length>(5 + `**${chat_head}**`.length) ){
+									if(output_str.trim().startsWith(`**${chat_head}**`)){  // 
+										output_str = output_str.replace(`**${chat_head}**`,''); // 避免重复出现
+										await insertContentToNote(output_str);
+									}
+									else{
+										await insertContentToNote(output_str);
+									}
+									need_add_head = false;
+								}
+							}
+							else{
+								await insertContentToNote(content); // 实时更新内容
+							}
+							// 滚动条移动到光标位置
+							await scroll_to_view(platform);
+						} catch (err) {
+							console.warn('Failed to parse line:', trimmedLine, err);
+							alert(`Failed to parse line: ${err}`);
+						}
 					}
+				}
+				else{
+					console.info('Chunk is not string: ', chunk);
 				}
 			}
 			if (need_add_head){ // 万一总长度不足导致上面没有执行；
