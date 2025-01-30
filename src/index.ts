@@ -99,28 +99,13 @@ joplin.plugins.register({
 			const chat_head = `Response from ${apiModel}:`;  // 不需要加粗
 			const chat_tail = '**End of response**';
 			// 
+			// 构造对话列表
 			let prompt_messages: OneMessage[] = [];
-			if (lst_msg.length>0){
+			if (lst_msg.length>0){ // 如果有传入的，直接使用
 				prompt_messages = lst_msg;
 			}
 			else{
-				// 任务类型
-				let prompt_head = '';
-				if(query_type=='summary'){
-					prompt_head = '请简要总结下文的主要内容，并用列表的方式列举提炼出的要点。';
-				}
-				else if(query_type=='ask'){
-					prompt_head = '你是严谨认真的AI助手, 你的任务是准确回复用户的问题。';
-				}
-				else if(query_type=='chat'){
-					prompt_head = '你是用户的助手。你的任务是以对话的方式，基于用户前文提供的信息，以对话的形式回复最后的段落。请注意，回复完成之后不要额外追问。';
-				}
-				else{
-					prompt_head = 'You are a helpful assistant.';
-				}
-				//
-				
-				if(query_type=='improve'){
+				if(query_type === 'improve'){
 					prompt_messages.push({ role: 'system', content: '你的任务是帮助用户完善文档。'});
 					if (str_before.length>0){
 						prompt_messages.push({role:'user',content:`【前文】\n\n${str_before}`});
@@ -134,18 +119,24 @@ joplin.plugins.register({
 					});
 				}
 				else{
+					// 任务类型
+					let prompt_head = 'You are a helpful assistant.';
+					if(query_type === 'summary'){
+						prompt_head = '请简要总结下文的主要内容，并用列表的方式列举提炼出的要点。';
+					}
+					else if(query_type === 'ask'){
+						prompt_head = '你是严谨认真的AI助手, 你的任务是准确回复用户的问题。';
+					}
+					else if(query_type === 'chat'){
+						prompt_head = '你是用户的助手。你的任务是以对话的方式，基于用户前文提供的信息，以对话的形式回复最后的段落。请注意，回复完成之后不要额外追问。';
+					}
 					prompt_messages.push({ role: 'system', content: prompt_head});
 					prompt_messages.push({ role: 'user', content: inp_str });
 				}
 			}
-			
 			// 构造请求体
 			const requestBody = {
 				model: apiModel, // 模型名称
-				// messages: [
-				// 	{ role: 'system', content: prompt_head},
-				// 	{ role: 'user', content: inp_str },
-				// ],
 				messages:prompt_messages,
 				stream: true, // 启用流式输出
 				temperature: apiTemperature,
@@ -172,12 +163,18 @@ joplin.plugins.register({
 			// 解析流式响应
 			const reader = response.body.getReader();
 			const decoder = new TextDecoder('utf-8');
-			const selectedText = await joplin.commands.execute('selectedText');
 			//
-			if (is_selection_exists) { // 如果有选中内容
-				await joplin.commands.execute('insertText', `${inp_str}`);
-			}
-
+			// 光标移动到选区最末尾
+			let selectionEnd = await joplin.commands.execute('editor.execCommand', {
+				name: 'getCursor',
+				args: ['to'],
+			}); 
+			await joplin.commands.execute('editor.execCommand', {
+				name: 'setCursor',
+				args: [selectionEnd]
+			});
+			//
+			// 打印 chat_head
 			let result = `\n\n**${chat_head}**\n`;
 			await joplin.commands.execute('insertText', result);
 
@@ -187,8 +184,10 @@ joplin.plugins.register({
 				await joplin.commands.execute('insertText', new_text); // 插入最新内容到笔记
 			};
 			//
-			// 滚动条移动到光标位置
-			const scroll_to_view = async(mode:string) =>{
+			/**
+			 * 滚动条移动到光标位置
+			 */
+			const scroll_to_view = async(mode:string='none') =>{
 				if (mode === 'desktop'){  
 					let tmp_pos_cursor = await joplin.commands.execute('editor.execCommand', {
 						name: 'getCursor',
@@ -199,10 +198,13 @@ joplin.plugins.register({
 					});							
 				}
 				else if (mode == 'mobile'){
-					if(query_type=='chat' && !is_selection_exists){
-						await joplin.commands.execute('editor.execCommand',{name:'scrollToLine',args:[100000000]});
-						/// 移动端似乎不支持上面的 ScrollIntoView，所以只能强制滚动到最后
-					}
+					// if(query_type=='chat' && !is_selection_exists){
+					// 	await joplin.commands.execute('editor.execCommand',{
+					// 		name:'scrollToLine',
+					// 		args:[100000000]
+					// 	});
+					// 	/// 移动端似乎不支持上面的 ScrollIntoView，所以只能强制滚动到最后
+					// }
 				}
 				else{
 					// 其他的不做任何事情
@@ -316,17 +318,23 @@ joplin.plugins.register({
 				try {
 					// 读取选中的内容：
 					let dict_selection = await split_note_by_selection();
-					// const selectedText = await joplin.commands.execute('selectedText');
-					// if (!selectedText || selectedText.trim() === '') {
-                    //     alert('请先选中一些文本！');
-                    //     return;
-                    // }
 					if (dict_selection.is_selection_exists){
-						await llm_reply_stream({inp_str:dict_selection.str_selected, 
-							query_type:'improve', 
-							is_selection_exists:dict_selection.is_selection_exists,
-							str_before:dict_selection.str_before,
-							str_after:dict_selection.str_after
+						let prompt_messages = []
+						prompt_messages.push({ role: 'system', content: '你的任务是帮助用户完善文档。'});
+						if (dict_selection.str_before.length>0){
+							prompt_messages.push({role:'user',content:`【前文】\n\n${dict_selection.str_before}`});
+						}
+						prompt_messages.push({ role: 'user', content: `【待处理部分】\n\n${dict_selection.str_selected}`});
+						if (dict_selection.str_after.length>0){
+							prompt_messages.push({role:'user',content:`【后文】\n\n${dict_selection.str_after}`});
+						}
+						prompt_messages.push({ role: 'user', 
+							content: `【要求】请参考前后文及其关联关系，按用户要求，修改'待处理部分'。请注意不要修改其余部分。请直接回复最终结果，不需要额外的文字。`
+						});
+						await llm_reply_stream({inp_str:dict_selection.str_selected,
+							query_type:'improve',
+							is_selection_exists:true,
+							lst_msg:prompt_messages
 						});
 						console.info('Streaming complete!');
 					}
@@ -341,59 +349,34 @@ joplin.plugins.register({
 		})
 		//
 		//
+		/**
+		 * chat 对话方式回复。
+		 * 如果有选中，就回复选中内容，输入是选中部分。 
+		 * 如果没有选中任何内容，就在光标处续写，输入为光标之前的部分。
+		 */
 		await joplin.commands.register({
 			name: 'askLLMChat',
 			label: 'LLM_对话方式回复',
 			iconName: 'fas fa-comments',
 			execute:async()=>{
 				try {
-					// 读取选中的内容：
-					const selectedText = await joplin.commands.execute('selectedText');
-					let tmp_note_body = ''
-					let is_selection_exists = false;
-					if (!selectedText || selectedText.trim() === '') { // 如果没有选中内容
-						is_selection_exists = false;
-						// 光标移动到最后
-						let tmp_num_lines = await joplin.commands.execute('editor.execCommand', {
-							name: 'lastLine',
+					let dict_selection = await split_note_by_selection();
+					if (dict_selection.is_selection_exists){
+						await llm_reply_stream({inp_str:dict_selection.str_selected, 
+							query_type:'chat', 
+							is_selection_exists:false
 						});
-						await joplin.commands.execute('editor.execCommand', {
-							name: 'setCursor',
-							args: [tmp_num_lines, Infinity]
-						});
-                        // 全文续写
-						let tmp_note = await joplin.workspace.selectedNote()
-						tmp_note_body = tmp_note.body
-						if(tmp_note_body.trim() === ''){
-							return;
-						}
                     }
-					else{ // 如果有选中内容
-						is_selection_exists = true;
-						tmp_note_body = selectedText;
-						// 选中前面部分
-						let content = await joplin.commands.execute('editor.execCommand', {
-							name: 'getValue',
-						}); // 获取文档内容
-						let selectionStart = await joplin.commands.execute('editor.execCommand', {
-							name: 'getCursor',
-							args: ['from'],
-						}); // 获取选中起点光标位置
-						let lines = content.split('\n'); // 按行分割文档内容
-						let beforeSelection = lines.slice(0, selectionStart.line).join('\n') + '\n' + lines[selectionStart.line].slice(0, selectionStart.ch);
-						// 选中后面部分
-						let selectionEnd = await joplin.commands.execute('editor.execCommand', {
-							name: 'getCursor',
-							args: ['to'],
-						}); // 获取选中结束光标位置
-						let afterSelection = lines[selectionEnd.line].slice(selectionEnd.ch) + '\n' + lines.slice(selectionEnd.line + 1).join('\n');
+					else{
+						await llm_reply_stream({inp_str:dict_selection.str_before, 
+							query_type:'chat', 
+							is_selection_exists:true
+						});
 					}
-					await llm_reply_stream({inp_str:tmp_note_body, query_type:'chat', 
-						is_selection_exists:is_selection_exists});
 					console.info('Streaming complete!');
 				}
 				catch(error){
-					console.error('Error executing search command:', error);
+					console.error('Error 295:', error);
 					alert(`Error 295: ${error}`);
 				}
 			}
@@ -401,8 +384,8 @@ joplin.plugins.register({
 		//
 		// 添加一个菜单项到顶部“工具”菜单中
 		await joplin.views.menus.create(
-			'askLLM', // 菜单项 ID
-			'ask LLM', // 菜单项名称
+			'askLLM_menus', // 菜单项 ID
+			'Note_LLM', // 菜单项名称
 			[
 			  {
 				label: 'askLLM_Summary',
@@ -432,12 +415,12 @@ joplin.plugins.register({
 		//
 		// 添加按钮到笔记编辑区的工具栏
         await joplin.views.toolbarButtons.create(
-            'askLLMStreamToolBarButton', // 按钮 ID
+            'askLLMStream_ToolBarButton', // 按钮 ID
             'askLLMStream',   // 绑定的命令名称
             ToolbarButtonLocation.EditorToolbar // 工具栏位置（支持移动端）
         );
         await joplin.views.toolbarButtons.create(
-            'askLLMChatToolBarButton', // 按钮 ID
+            'askLLMChat_ToolBarButton', // 按钮 ID
             'askLLMChat',   // 绑定的命令名称
             ToolbarButtonLocation.EditorToolbar // 工具栏位置（支持移动端）
         );
@@ -448,10 +431,10 @@ joplin.plugins.register({
 			'askLLMStream',   // 绑定的命令
 			MenuItemLocation.EditorContextMenu // 添加到编辑器上下文菜单
 		);
-		await joplin.views.menuItems.create(
-			'askLLMSummary_MenuItem', // 菜单项 ID
-			'askLLMSummary',   // 绑定的命令
-			MenuItemLocation.EditorContextMenu // 添加到编辑器上下文菜单
-		);
+		// await joplin.views.menuItems.create(
+		// 	'askLLMSummary_MenuItem', // 菜单项 ID
+		// 	'askLLMSummary',   // 绑定的命令
+		// 	MenuItemLocation.EditorContextMenu // 添加到编辑器上下文菜单
+		// );
 	},
 });
