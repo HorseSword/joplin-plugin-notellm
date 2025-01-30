@@ -1,0 +1,16 @@
+{
+	"manifest_version": 1,
+	"id": "home.sword.NoteLLM",
+	"app_min_version": "3.2",
+	"version": "1.0.0",
+	"name": "NoteLLM",
+	"description": "LLM for Notes.",
+	"author": "Sword",
+	"homepage_url": "pass",
+	"repository_url": "pass",
+	"keywords": [],
+	"categories": [],
+	"screenshots": [],
+	"icons": {},
+	"promo_tile": {}
+}
