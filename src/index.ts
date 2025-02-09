@@ -140,7 +140,7 @@ joplin.plugins.register({
 		await joplin.commands.register({
 			name: 'askLLMImprove',
 			label: 'LLM_改写选中的部分 (需选中内容)',
-			iconName: 'fas fa-hand-point-up',
+			iconName: 'fas fa-hands-helping',
 			execute:async()=>{
 				try {
 					// 读取选中的内容：
