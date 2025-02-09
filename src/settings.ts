@@ -12,6 +12,20 @@ export async function registerSettings(): Promise<void> {
     });
   
     await joplin.settings.registerSettings({
+      llmSelect: { // Temperature
+        type: SettingItemType.Int,
+        value: 1,
+        label: 'LLM select',
+        description: 'Which one do you want to use?',
+        section: 'notellm.settings',
+        public: true,
+        advanced: false,
+        isEnum:true,
+        options: {
+          1: 'LLM 1',
+          2: 'LLM 2'
+        }
+      },
       llmServerUrl: {
         type: SettingItemType.String,
         value: 'https://api.deepseek.com/v1',
@@ -41,7 +55,7 @@ export async function registerSettings(): Promise<void> {
         advanced: false,
         secure: true, // 密码输入框
       },
-      // 高级选项
+      
       llmServerUrl2: {
         type: SettingItemType.String,
         value: 'https://api.deepseek.com/v1',
@@ -49,7 +63,7 @@ export async function registerSettings(): Promise<void> {
         section: 'notellm.settings',
         public: true,
         label: 'The 2nd llm server url',
-        advanced: true,
+        advanced: false,
       },
       llmModel2: {
         type: SettingItemType.String,
@@ -58,7 +72,7 @@ export async function registerSettings(): Promise<void> {
         section: 'notellm.settings',
         public: true,
         label: 'The 2nd llm model',
-        advanced: true,
+        advanced: false,
       },
       //
       llmKey2: {
@@ -68,24 +82,11 @@ export async function registerSettings(): Promise<void> {
         section: 'notellm.settings',
         public: true,
         label: 'The 2nd llm key',
-        advanced: true,
+        advanced: false,
         secure: true, // 密码输入框
       },
-      llmSelect: { // Temperature
-        type: SettingItemType.Int,
-        value: 1,
-        label: 'LLM select',
-        description: 'Which one do you want to use?',
-        section: 'notellm.settings',
-        public: true,
-        advanced: true,
-        isEnum:true,
-        options: {
-          1: 'LLM 1',
-          2: 'LLM 2'
-        }
-      },
-      
+      // 高级选项
+      //
       llmScrollType: { // Temperature
         type: SettingItemType.Int,
         value: 1,

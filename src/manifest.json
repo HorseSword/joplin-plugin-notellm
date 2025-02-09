@@ -2,7 +2,7 @@
 	"manifest_version": 1,
 	"id": "home.sword.NoteLLM",
 	"app_min_version": "3.0",
-	"version": "0.3.11",
+	"version": "0.3.14",
 	"name": "NoteLLM",
 	"description": "LLM for notes",
 	"author": "Sword",
