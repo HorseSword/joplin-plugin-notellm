@@ -98,7 +98,7 @@ joplin.plugins.register({
 		// 摘要
 		await joplin.commands.register({
 			name: 'askLLMSummary',
-			label: 'LLM_为选中的部分生成摘要 (需选中内容)',
+			label: 'Summarize selection',
 			iconName: 'fas fa-robot',
 			execute: async () => {
 				try {
@@ -139,7 +139,7 @@ joplin.plugins.register({
 		 */
 		await joplin.commands.register({
 			name: 'askLLMImprove',
-			label: 'LLM_改写选中的部分 (需选中内容)',
+			label: 'Improve selection (context related)',
 			iconName: 'fas fa-hands-helping',
 			execute:async()=>{
 				try {
@@ -180,7 +180,7 @@ joplin.plugins.register({
 		 */
 		await joplin.commands.register({
 			name: 'askLLMSelected',
-			label: 'LLM_针对选中的部分提问 (需选中内容)',
+			label: 'Ask about selection',
 			iconName: 'fas fa-robot',
 			execute:async()=>{
 				try {
@@ -225,7 +225,7 @@ joplin.plugins.register({
 		 */
 		await joplin.commands.register({
 			name: 'askLLMChat',
-			label: 'LLM_对话方式回复',
+			label: 'Chat and reply',
 			iconName: 'fas fa-comments',
 			execute:async()=>{
 				try {
@@ -290,11 +290,11 @@ joplin.plugins.register({
 		// );
 		//
 		// 添加按钮到笔记编辑区的工具栏
-        await joplin.views.toolbarButtons.create(
-            'askLLMStream_ToolBarButton', // 按钮 ID
-            'askLLMImprove',   // 绑定的命令名称
-            ToolbarButtonLocation.EditorToolbar // 工具栏位置（支持移动端）
-        );
+        // await joplin.views.toolbarButtons.create(
+        //     'askLLMStream_ToolBarButton', // 按钮 ID
+        //     'askLLMImprove',   // 绑定的命令名称
+        //     ToolbarButtonLocation.EditorToolbar // 工具栏位置（支持移动端）
+        // );
         await joplin.views.toolbarButtons.create(
             'askLLMChat_ToolBarButton', // 按钮 ID
             'askLLMChat',   // 绑定的命令名称
