@@ -12,8 +12,13 @@
     "joplin-plugin"
   ],
   "files": [
-    "publish"
+    "publish",
+    "_img"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HorseSword/joplin-plugin-notellm.git" 
+  },
   "devDependencies": {
     "@types/node": "^18.7.13",
     "chalk": "^4.1.0",
