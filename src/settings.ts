@@ -15,7 +15,7 @@ export async function registerSettings(): Promise<void> {
       llmSelect: { // Temperature
         type: SettingItemType.Int,
         value: 1,
-        label: 'LLM select',
+        label: 'The 1st LLM select',
         description: 'Which one do you want to use?',
         section: 'notellm.settings',
         public: true,
@@ -29,7 +29,7 @@ export async function registerSettings(): Promise<void> {
       llmServerUrl: {
         type: SettingItemType.String,
         value: 'https://api.deepseek.com/v1',
-        description: 'LLM server URL 1, e.g. https://api.deepseek.com/v1',
+        description: 'The 1st LLM server URL, e.g. https://api.deepseek.com/v1',
         section: 'notellm.settings',
         public: true,
         label: 'llm server url',
@@ -38,7 +38,7 @@ export async function registerSettings(): Promise<void> {
       llmModel: {
         type: SettingItemType.String,
         value: 'deepseek-chat',
-        description: 'LLM Model Name 1, e.g. moonshot-v1-8k, deepseek-chat',
+        description: 'The 1st LLM Model Name, e.g. moonshot-v1-8k, deepseek-chat',
         section: 'notellm.settings',
         public: true,
         label: 'llm model',
@@ -48,7 +48,7 @@ export async function registerSettings(): Promise<void> {
       llmKey: {
         type: SettingItemType.String,
         value: '',
-        description: 'LLM key 1',
+        description: 'API-key for LLM 1.',
         section: 'notellm.settings',
         public: true,
         label: 'llm key',
@@ -59,7 +59,7 @@ export async function registerSettings(): Promise<void> {
       llmServerUrl2: {
         type: SettingItemType.String,
         value: 'https://api.deepseek.com/v1',
-        description: 'The 2nd LLM server URL (optional), e.g. https://api.deepseek.com/v1',
+        description: 'The 2nd LLM server URL (optional).',
         section: 'notellm.settings',
         public: true,
         label: 'The 2nd llm server url',
@@ -68,7 +68,7 @@ export async function registerSettings(): Promise<void> {
       llmModel2: {
         type: SettingItemType.String,
         value: 'deepseek-chat',
-        description: 'The 2nd LLM Model Name (optional), e.g. moonshot-v1-8k, deepseek-chat',
+        description: 'The 2nd LLM Model Name (optional).',
         section: 'notellm.settings',
         public: true,
         label: 'The 2nd llm model',
@@ -78,7 +78,7 @@ export async function registerSettings(): Promise<void> {
       llmKey2: {
         type: SettingItemType.String,
         value: '',
-        description: 'The 2nd LLM key (optional)',
+        description: 'API key for the 2nd LLM (optional)',
         section: 'notellm.settings',
         public: true,
         label: 'The 2nd llm key',
@@ -114,7 +114,7 @@ export async function registerSettings(): Promise<void> {
       llmMaxTokens: { // length
         type: SettingItemType.String,
         value: 1024,
-        description: 'Num of max tokens. e.g. 1024, 4096.',
+        description: 'Num of max tokens. e.g. 1024, 2048, 4096.',
         section: 'notellm.settings',
         public: true,
         label: 'llm max tokens.',

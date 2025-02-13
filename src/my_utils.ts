@@ -244,5 +244,5 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     }
     await scroll_to_view(platform);
     // await joplin.views.dialogs.showToast({message:'Finished successfully.', duration:5000, type:'success'});
-    await (joplin.views.dialogs as any).showToast({message:'回复完毕！', duration:2500+(Date.now()%500), type:'success',timestamp: Date.now()});
+    await (joplin.views.dialogs as any).showToast({message:'Response finished.', duration:2500+(Date.now()%500), type:'success',timestamp: Date.now()});
 }

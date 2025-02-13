@@ -8,9 +8,7 @@ import {llmReplyStream} from './my_utils';
 
 joplin.plugins.register({
 	onStart: async function() {
-		// eslint-disable-next-line no-console
 		console.info('Hello world. NoteLLM plugin started!');
-		// const notyf = new Notyf();
 		let platform = 'desktop';
 		//
 		// 设置项
@@ -116,7 +114,7 @@ joplin.plugins.register({
 						});
 					}
 					else{
-						alert('请先选中一些文本！');
+						alert('Please select some text first.');
 				 	    return;
 					}
 					// const selectedText = await joplin.commands.execute('selectedText');
@@ -129,7 +127,7 @@ joplin.plugins.register({
 					//
 				}
 				catch(error){
-					alert(`调用 LLM API 时出错：${error}`);
+					alert(`Error 132: ${error}`);
 					console.error('Error executing command:', error);
 				}
 			},
@@ -167,7 +165,7 @@ joplin.plugins.register({
 					}
 					else{
 						// alert('请先选中一些文本！');
-						await (joplin.views.dialogs as any).showToast({message:'请先选中一些文本！', duration:3000+(Date.now()%100), type:'error',timestamp: Date.now()});
+						await (joplin.views.dialogs as any).showToast({message:'Please select some text first.', duration:3000+(Date.now()%100), type:'error',timestamp: Date.now()});
 					}
 				}
 				catch(error){
@@ -208,7 +206,7 @@ joplin.plugins.register({
 					}
 					else{
 						// alert('请先选中一些文本！');
-						await (joplin.views.dialogs as any).showToast({message:'请先选中一些文本！', duration:3000+(Date.now()%100), type:'error',timestamp: Date.now()});
+						await (joplin.views.dialogs as any).showToast({message:'Please select some text first.', duration:3000+(Date.now()%100), type:'error',timestamp: Date.now()});
 					}
 				}
 				catch(error){
