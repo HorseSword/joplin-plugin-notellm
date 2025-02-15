@@ -5,20 +5,24 @@ This is a plugin for Joplin, designed to be your very own AI-powered note plugin
 ![notellm](./_img/notellm.gif)
 
 ## Features
-- **Customizable LLM Service Source**: Configure the source of your Large Language Model (LLM) service, including options like `openai-api`, `deepseek`, `qwen`, or even a local LLM server that is compatible with `openai-api`. Configuration requires specifying a URL, API key, and model name.
+
+- **Customizable LLM Service Source**: Configure the source of your Large Language Model (LLM) service, including options like `openai`, `deepseek`, `qwen`, or even a local LLM server that is compatible with `openai-api`. Configuration requires specifying a URL, API key, and model name.
 - **Summarization**: Summarize selected text portions efficiently.
 - **Text Optimization**: Improve the expression of selected text by considering its context.
 - **Question & Answer**: Generate answers to questions based on selected text.
 - **Chat Functionality**: Engage in conversations with AI based on all preceding content up to your cursor position, providing real-time assistance for writing.
 
 ### Mobile Support
-Currently, mobile users can enjoy the chat functionality over the entire note text. Others are ubder development.
+
+Currently, mobile users can enjoy the chat functionality over the entire note text. 
+
+Others functions are under development.
 
 ## Usage Instructions
 
 After installing this plugin, you should go to settings to configure your ai options. At least input one URL, API key, and model name.
 
-You can configure two and switch between them.
+You can configure two LLMs and switch between them.
 
 ![image-20250211191521564](./_img/image-20250211191521564.png)
 
