@@ -2,6 +2,7 @@ import joplin from 'api';
 import {ToolbarButtonLocation, ContentScriptType, MenuItemLocation } from 'api/types';
 import { registerSettings, pluginIconName } from './settings';
 import {llmReplyStream} from './my_utils';
+// import {llmReplyStream} from './my_openai_utils';
 
 // import OpenAI from "openai";
 // import { MenuItemLocation } from 'api/types'; // 导入 MenuItemLocation 类型
@@ -161,7 +162,6 @@ joplin.plugins.register({
 							is_selection_exists:true,
 							lst_msg:prompt_messages
 						});
-						console.info('Streaming complete!');
 					}
 					else{
 						// alert('请先选中一些文本！');

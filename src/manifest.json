@@ -2,16 +2,18 @@
 	"manifest_version": 1,
 	"id": "home.sword.NoteLLM",
 	"app_min_version": "3.2",
-	"version": "0.3.16",
+	"version": "0.3.17",
 	"name": "NoteLLM",
-	"description": "NoteLLM is a plugin for Joplin, designed to be your very own AI-powered note plugin. It's completely open-source and does not collect any logs or personal information.",
+	"description": "Your very own AI-powered note plugin. It's completely open-source and does not collect any logs or personal information.",
 	"author": "HorseSword",
 	"homepage_url": "https://github.com/HorseSword/joplin-plugin-notellm",
 	"repository_url": "https://github.com/HorseSword/joplin-plugin-notellm",
 	"keywords": [
 		"AI",
 		"LLM",
-		"GPT"
+		"GPT",
+		"openai",
+		"deepseek"
 	],
 	"categories": [
 		"productivity"
@@ -19,7 +21,7 @@
 	"screenshots": [
 		{
 			"src": "_img/notellm.gif",
-			"label": "NoteLLM is designed to be your very own AI-powered note plugin. "
+			"label": "Your very own AI-powered note plugin. "
 		}
 	],
 	"icons": {},
