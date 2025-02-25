@@ -1,6 +1,6 @@
 # Joplin Plugin: NoteLLM
 
-This is a plugin for Joplin, designed to be your very own AI-powered note plugin. It's completely open-source and does not collect any logs or personal information.
+To be your very own AI-powered note plugin for Joplin. It's completely open-source and does not collect any logs or personal information.
 
 ![notellm](./_img/notellm.gif)
 
@@ -19,6 +19,10 @@ Currently, mobile users can enjoy the chat functionality over the entire note te
 Others functions are under development.
 
 ## Usage Instructions
+
+**This plugin can only work in markdown editor!!!!**
+**This plugin can only work in markdown editor!!!!**
+**This plugin can only work in markdown editor!!!!**
 
 After installing this plugin, you should go to settings to configure your ai options. At least input one URL, API key, and model name.
 
