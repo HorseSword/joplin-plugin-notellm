@@ -1,6 +1,6 @@
 {
   "name": "joplin-plugin-notellm",
-  "version": "0.3.17",
+  "version": "0.3.19",
   "scripts": {
     "dist": "webpack --env joplin-plugin-config=buildMain && webpack --env joplin-plugin-config=buildExtraScripts && webpack --env joplin-plugin-config=createArchive",
     "prepare": "npm run dist",
@@ -20,6 +20,7 @@
     "url": "git+https://github.com/HorseSword/joplin-plugin-notellm.git"
   },
   "devDependencies": {
+    "@codemirror/view": "^6.36.3",
     "@types/node": "^18.7.13",
     "chalk": "^4.1.0",
     "copy-webpack-plugin": "^11.0.0",

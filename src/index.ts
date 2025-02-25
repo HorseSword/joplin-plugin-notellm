@@ -12,6 +12,13 @@ joplin.plugins.register({
 		console.info('Hello world. NoteLLM plugin started!');
 		let platform = 'desktop';
 		//
+		const contentScriptId = 'some-content-script-id';
+        joplin.contentScripts.register(
+            ContentScriptType.CodeMirrorPlugin,
+            contentScriptId,
+            './contentScript.js',
+        );
+		//
 		// 设置项
 		await registerSettings();
 		/**
@@ -19,13 +26,24 @@ joplin.plugins.register({
 		 * 
 		 * 返回值：
 		 * {
-		 * is_selection_exists: 是否有选中项,  true / false; 
-		 * str_before: 选区或光标之前的内容, 
-		 * str_selected: 选中的内容,
-		 * str_after: 选取之后或光标之后的内容。
+		 *   is_selection_exists: 是否有选中项,  true / false; 
+		 *   str_before: 选区或光标之前的内容, 
+		 *   str_selected: 选中的内容,
+		 *   str_after: 选取之后或光标之后的内容。
 		 * }
 		 */
 		async function split_note_by_selection(split_char:string='@TODO') {
+			let selectionInfo = await joplin.commands.execute('editor.execCommand', 
+				{ name: 'cm-getSelectionInfo' }
+			);
+			return {
+				is_selection_exists: selectionInfo.isSelectionExists, 
+				str_before: selectionInfo.beforeText, 
+				str_selected: selectionInfo.selectedText, 
+				str_after: selectionInfo.afterText
+			}
+		}
+		async function split_note_by_selection_old(split_char:string='@TODO') {
 			let is_selection_exists = false;
 			let content:string = await joplin.commands.execute('editor.execCommand', {
 				name: 'getValue',
@@ -97,7 +115,7 @@ joplin.plugins.register({
 		// 摘要
 		await joplin.commands.register({
 			name: 'askLLMSummary',
-			label: 'Summarize selection',
+			label: 'Summarize selection (or above cursor)',
 			iconName: 'fas fa-robot',
 			execute: async () => {
 				try {
@@ -106,26 +124,29 @@ joplin.plugins.register({
 					if (dict_selection.is_selection_exists){
 						let prompt_messages = []
 						prompt_messages.push({ role: 'system', content: dict_selection.str_selected});
-						prompt_messages.push({ role: 'user', content: '请简要概括上文的主要内容，并用列表的方式列举提炼出的要点（需要时可使用分级列表）。' });
+						prompt_messages.push({ role: 'user', content: '请简要概括上文的主要内容，并用列表的方式列举提炼出的要点。' });
 						//
-						await llmReplyStream({inp_str:dict_selection.str_selected, 
+						await llmReplyStream({
+							inp_str:'nothing', 
 							query_type:'summary', 
 							lst_msg:prompt_messages,
 							is_selection_exists:true
 						});
 					}
 					else{
-						alert('Please select some text first.');
+						let prompt_messages = []
+						prompt_messages.push({ role: 'system', content: dict_selection.str_before});
+						prompt_messages.push({ role: 'user', content: '请简要概括上文的主要内容，并用列表的方式列举提炼出的要点。' });
+						//
+						await llmReplyStream({
+							inp_str:'nothing', 
+							query_type:'summary', 
+							lst_msg:prompt_messages,
+							is_selection_exists:true
+						});
+						// alert('Please select some text first.');
 				 	    return;
 					}
-					// const selectedText = await joplin.commands.execute('selectedText');
-					// if (!selectedText || selectedText.trim() === '') {
-                    //     alert('请先选中一些文本！');
-                    //     return;
-                    // }
-					//
-					
-					//
 				}
 				catch(error){
 					alert(`Error 132: ${error}`);
@@ -142,6 +163,8 @@ joplin.plugins.register({
 			iconName: 'fas fa-hands-helping',
 			execute:async()=>{
 				try {
+					// 弹窗 TODO
+					let user_command = ''
 					// 读取选中的内容：
 					let dict_selection = await split_note_by_selection();
 					if (dict_selection.is_selection_exists){
@@ -151,6 +174,9 @@ joplin.plugins.register({
 							prompt_messages.push({role:'user',content:`<text_before_selection>\n\n${dict_selection.str_before}\n\n</text_before_selection>`});
 						}
 						prompt_messages.push({ role: 'user', content: `<text_selected>\n\n${dict_selection.str_selected}\n\n</text_selected>`});
+						if (user_command.length>0){
+							prompt_messages.push({role:'user',content:`<command>\n\n${user_command}\n\n</command>`});
+						}
 						if (dict_selection.str_after.length>0){
 							prompt_messages.push({role:'user',content:`<text_after_selection>\n\n${dict_selection.str_after}\n\n</text_after_selection>`});
 						}
@@ -164,8 +190,8 @@ joplin.plugins.register({
 						});
 					}
 					else{
-						// alert('请先选中一些文本！');
-						await (joplin.views.dialogs as any).showToast({message:'Please select some text first.', duration:3000+(Date.now()%100), type:'error',timestamp: Date.now()});
+						alert('Please select some text first.');
+						// await (joplin.views.dialogs as any).showToast({message:'Please select some text first.', duration:3000+(Date.now()%100), type:'error',timestamp: Date.now()});
 					}
 				}
 				catch(error){
@@ -205,8 +231,8 @@ joplin.plugins.register({
 						console.info('Streaming complete!');
 					}
 					else{
-						// alert('请先选中一些文本！');
-						await (joplin.views.dialogs as any).showToast({message:'Please select some text first.', duration:3000+(Date.now()%100), type:'error',timestamp: Date.now()});
+						alert('Please select where you want to ask.');
+						// await (joplin.views.dialogs as any).showToast({message:'Please select some text first.', duration:3000+(Date.now()%100), type:'error',timestamp: Date.now()});
 					}
 				}
 				catch(error){
@@ -223,7 +249,7 @@ joplin.plugins.register({
 		 */
 		await joplin.commands.register({
 			name: 'askLLMChat',
-			label: 'Chat and reply',
+			label: 'Chat and reply (above cursor)',
 			iconName: 'fas fa-comments',
 			execute:async()=>{
 				try {

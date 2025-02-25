@@ -15,7 +15,6 @@ interface OneMessage {
  */
 export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', is_selection_exists=true, str_before='', str_after=''}){
     //
-    let platform = 'desktop';
     // 读取设置的参数
     const llmSettingValues = await joplin.settings.values(['llmModel','llmServerUrl','llmKey',
         'llmModel2','llmServerUrl2','llmKey2', 'llmSelect',
@@ -25,26 +24,28 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
     llmSelect = parseInt(String(llmSelect));
     //
     let apiModel = '', apiUrl = '', apiKey = '';
-    if(llmSelect==2){
-        apiModel = String(llmSettingValues['llmModel2']);
-        apiUrl = String(llmSettingValues['llmServerUrl2']) + '/chat/completions';
-        apiKey = String(llmSettingValues['llmKey2']);
-    }
-    else{
+    if(llmSelect==1){
         apiModel = String(llmSettingValues['llmModel']);
         apiUrl = String(llmSettingValues['llmServerUrl']) + '/chat/completions';
         apiKey = String(llmSettingValues['llmKey']);
     }
+    else if(llmSelect==2){
+        apiModel = String(llmSettingValues['llmModel2']);
+        apiUrl = String(llmSettingValues['llmServerUrl2']) + '/chat/completions';
+        apiKey = String(llmSettingValues['llmKey2']);
+    } 
     // 高级参数
     let apiTemperature = llmSettingValues['llmTemperature'];
     apiTemperature = parseFloat(String(apiTemperature));
     let apiMaxTokens = llmSettingValues['llmMaxTokens']
     apiMaxTokens = parseInt(String(apiMaxTokens)) ;
+    //
+    let platform = 'none';
     let llmScrollType = llmSettingValues['llmScrollType']
     llmScrollType = parseInt(String(llmScrollType)) ;
     if (llmScrollType==1){platform = 'desktop'}
     else if (llmScrollType==2){platform = 'mobile'}
-    else{platform = 'none'}
+    else {platform = 'none'};
     //
     // client
     const openai_client = new OpenAI({
@@ -100,6 +101,8 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
     //
     //
     // 光标移动到选区最末尾
+    await joplin.commands.execute('editor.execCommand', {name: 'cm-moveCursorToSelectionEnd'});
+    /*
     try{
         let selectionEnd = await joplin.commands.execute('editor.execCommand', {
             name: 'getCursor',
@@ -115,10 +118,41 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
             await joplin.commands.execute('insertText', `${inp_str}`);
         }
     }
+    */
+    /**
+     * 滚动条移动到光标位置
+     */
+    const myScrollToCursor = async(mode:string='none') =>{
+        if (mode === 'desktop'){
+            let tmp_pos_cursor = await joplin.commands.execute('editor.execCommand', {
+                name: 'getCursor',
+                args:['to']
+            }); // 当前光标位置
+            await joplin.commands.execute('editor.execCommand', {
+                name: 'scrollIntoView',
+                args: [tmp_pos_cursor],
+            });	
+        } else if (mode === 'mobile'){
+            let selectionInfo = await joplin.commands.execute('editor.execCommand', {
+                name: 'cm-getSelectionInfo' 
+            });
+            console.info(selectionInfo.endPosition);
+            await joplin.commands.execute('editor.execCommand',{
+                // name:'scrollToLine',
+                // args:[cursorPos.startLine+1]
+                name:'scrollIntoView',
+                args:[selectionInfo.endPosition]
+            });
+            // await joplin.commands.execute('editor.execCommand',{
+                // name:'cm-scrollToCursor'
+            // });
+        }
+    }
     //
     // 打印 chat_head
     let result = `\n\n**${chat_head}**\n`;
     await joplin.commands.execute('insertText', result);
+    await myScrollToCursor(platform);
 
     // 实时更新笔记中的回复
     const insertContentToNote = async (new_text: string) => {
@@ -126,10 +160,8 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
         await joplin.commands.execute('insertText', new_text); // 插入最新内容到笔记
     };
     //
-    /**
-     * 滚动条移动到光标位置
-     */
-    const scrollToCursor = async(mode:string='none') =>{
+    
+    const scrollToCursor_old = async(mode:string='none') =>{
         if (mode === 'desktop'){  
             let tmp_pos_cursor = await joplin.commands.execute('editor.execCommand', {
                 name: 'getCursor',
@@ -140,6 +172,8 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
             });							
         }
         else if (mode === 'mobile'){
+            joplin.commands.execute('editor.execCommand', { name: 'cm-scrollToCursor' });
+            /*
             if(query_type=='chat' && !is_selection_exists){
                 await joplin.commands.execute('editor.execCommand',{
                     name:'scrollToLine',
@@ -147,9 +181,11 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
                 });
                 /// 移动端似乎不支持上面的 ScrollIntoView，所以只能强制滚动到最后
             }
+            */
         }
         else{
             // 其他的不做任何事情
+            
         }
     }
 
@@ -160,6 +196,11 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
     
     for await (const chunk of completion) {
         try {
+            // 滚动条移动到光标位置
+            if (platform == 'desktop'){
+                await myScrollToCursor(platform);
+            }
+            //
             const content = chunk.choices[0]?.delta?.content || '';
             output_str+=content;
             if(need_add_head){
@@ -181,10 +222,10 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
             else{
                 await insertContentToNote(content); // 实时更新内容
             }
-            // 滚动条移动到光标位置
-            await scrollToCursor(platform);
+            //
         } catch (err) {
-            alert(`Failed to parse line: ${err}`);
+            // alert(`Failed to parse line: ${err}`);
+            console.error(`Failed to parse line: ${err}`)
         }
     }
 
@@ -197,7 +238,15 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
     else{
         await joplin.commands.execute('insertText', `\n${chat_tail}\n\n`);
     }
-    await scrollToCursor(platform);
-    // await joplin.views.dialogs.showToast({message:'Finished successfully.', duration:5000, type:'success'});
-    await (joplin.views.dialogs as any).showToast({message:'Response finished.', duration:2500+(Date.now()%500), type:'success',timestamp: Date.now()});
+    if (platform === 'desktop'){
+        await myScrollToCursor(platform);
+    }
+    //
+    try{
+        // await joplin.views.dialogs.showToast({message:'Finished successfully.', duration:5000, type:'success'});
+        await (joplin.views.dialogs as any).showToast({message:'Response finished.', duration:2500+(Date.now()%500), type:'success',timestamp: Date.now()});
+    }
+    catch{
+
+    }
 }

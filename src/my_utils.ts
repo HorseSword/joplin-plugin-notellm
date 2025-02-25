@@ -12,20 +12,36 @@ interface OneMessage {
  */
 export async function scroll_to_view (mode:string='none') {
     if (mode === 'desktop'){  
-        let tmp_pos_cursor = await joplin.commands.execute('editor.execCommand', {
-            name: 'getCursor',
-        }); // 当前光标位置
+        // let tmp_pos_cursor = await joplin.commands.execute('editor.execCommand', {
+        //     name: 'getCursor',
+        // }); // 当前光标位置
+        // await joplin.commands.execute('editor.execCommand', {
+        //     name: 'scrollIntoView',
+        //     args: [tmp_pos_cursor],
+        // });							
         await joplin.commands.execute('editor.execCommand', {
-            name: 'scrollIntoView',
-            args: [tmp_pos_cursor],
-        });							
+            name: 'cm-moveCursorToSelectionEnd' 
+        });
     }
-    else if (mode === 'mobile'){
+    else if (mode === 'mobile'){        
+        // let selectionInfo = await joplin.commands.execute('editor.execCommand', {
+        //     name: 'cm-getSelectionInfo' 
+        // });
+        // console.info(selectionInfo.endPosition);
+        // await joplin.commands.execute('editor.execCommand',{
+        //     // name:'scrollToLine',
+        //     // args:[cursorPos.startLine+1]
+        //     name:'scrollIntoView',
+        //     args:[selectionInfo.endPosition]
+        // });
+        await joplin.commands.execute('editor.execCommand', {
+            name: 'cm-scrollToCursor' 
+        });
         // if(query_type=='chat' && !is_selection_exists){
-            await joplin.commands.execute('editor.execCommand',{
-                name:'scrollToLine',
-                args:[100000000]
-            });
+            // await joplin.commands.execute('editor.execCommand',{
+            //     name:'scrollToLine',
+            //     args:[100000000]
+            // });
             /// 移动端似乎不支持上面的 ScrollIntoView，所以只能强制滚动到最后
         // }
     }
@@ -38,7 +54,8 @@ export async function scroll_to_view (mode:string='none') {
  * 
  * 这个函数的作用是，根据传入的文本，流式返回结果。
  */
-export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', is_selection_exists=true, str_before='', str_after=''}){
+export async function llmReplyStream({inp_str, lst_msg = [], 
+    query_type='chat', is_selection_exists=true, str_before='', str_after=''}){
     //
     // 读取设置的参数
     const llmSettingValues = await joplin.settings.values(['llmModel','llmServerUrl','llmKey',
@@ -64,6 +81,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
     apiTemperature = parseFloat(String(apiTemperature));
     let apiMaxTokens = llmSettingValues['llmMaxTokens']
     apiMaxTokens = parseInt(String(apiMaxTokens)) ;
+    //
     let llmScrollType = llmSettingValues['llmScrollType']
     llmScrollType = parseInt(String(llmScrollType)) ;
     let platform = 'desktop';
@@ -72,6 +90,8 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
     else{platform = 'none'}
     //
     // 光标移动到选区最末尾
+    await joplin.commands.execute('editor.execCommand', {name: 'cm-moveCursorToSelectionEnd'});
+    /*
     try{
         let selectionEnd = await joplin.commands.execute('editor.execCommand', {
             name: 'getCursor',
@@ -87,6 +107,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
             await joplin.commands.execute('insertText', `${inp_str}`);
         }
     }
+    */
     //
     const chat_head = `Response from ${apiModel}:`;  // 不需要加粗
     const chat_tail = '**End of response**';
@@ -97,18 +118,13 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
     // 
     // 构造对话列表
     let prompt_messages: OneMessage[] = [];
-    if (lst_msg.length>0){ // 如果有传入的，直接使用
+    // 如果有传入的，直接使用
+    if (lst_msg.length>0){ 
         prompt_messages = lst_msg;
     }
     else{
         let prompt_head = 'You are a helpful assistant.';
-        if(query_type === 'summary'){
-            prompt_head = '请简要总结下文的主要内容，并用列表的方式列举提炼出的要点。';
-        }
-        else if(query_type === 'ask'){
-            prompt_head = '你是严谨认真的AI助手, 你的任务是准确回复用户的问题。';
-        }
-        else if(query_type === 'chat'){
+        if(query_type === 'chat'){
             prompt_head = '你是用户的助手。你的任务是以对话的方式，基于用户前文提供的信息，以对话的形式回复最后的段落。请注意，回复完成之后不要额外追问。';
         }
         prompt_messages.push({ role: 'system', content: prompt_head});
@@ -138,7 +154,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
     if (!response.ok || !response.body) {
         const errorText = await response.text();
         console.error('Error from LLM API:', errorText);
-        alert(`调用 LLM API 时出错：${response.status} ${response.statusText}`);
+        alert(`ERROR 156: ${response.status} ${response.statusText}`);
         return;
     }
     // 解析流式响应
@@ -150,13 +166,18 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
         result += new_text; // 将新内容拼接到结果中
         await joplin.commands.execute('insertText', new_text); // 插入最新内容到笔记
     };
+    // 滚动条移动到光标位置
+    await scroll_to_view(platform);
     //
     // 逐块读取流式数据
     let output_str = '';
     let need_add_head = true;
+    let fail_count = 0
+    const fail_count_max = 3
     while (true) {
         const { done, value } = await reader.read();
         if (done) break; // 流结束时退出循环
+        if (fail_count>=fail_count_max) break;  // 连续失败后退出
 
         // 解码并解析数据块
         const chunk:string = decoder.decode(value, { stream: true });
@@ -200,6 +221,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
                             }
                             need_add_head = false;
                         }
+                        fail_count = 0;
                     }
                     else{
                         await insertContentToNote(content); // 实时更新内容
@@ -209,6 +231,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
                 } catch (err) {
                     console.warn('Failed to parse line:', trimmedLine, err);
                     alert(`Failed to parse line: ${err}`);
+                    fail_count += 1;
                 }
             }
         }
