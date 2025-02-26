@@ -1,4 +1,5 @@
 import joplin from '../api';
+
 /**
  * 对话的消息体类
  */
@@ -11,39 +12,15 @@ interface OneMessage {
  * 滚动条移动到光标位置
  */
 export async function scroll_to_view (mode:string='none') {
-    if (mode === 'desktop'){  
-        // let tmp_pos_cursor = await joplin.commands.execute('editor.execCommand', {
-        //     name: 'getCursor',
-        // }); // 当前光标位置
-        // await joplin.commands.execute('editor.execCommand', {
-        //     name: 'scrollIntoView',
-        //     args: [tmp_pos_cursor],
-        // });							
+    if (mode === 'desktop'){  					
         await joplin.commands.execute('editor.execCommand', {
             name: 'cm-moveCursorToSelectionEnd' 
         });
     }
     else if (mode === 'mobile'){        
-        // let selectionInfo = await joplin.commands.execute('editor.execCommand', {
-        //     name: 'cm-getSelectionInfo' 
-        // });
-        // console.info(selectionInfo.endPosition);
-        // await joplin.commands.execute('editor.execCommand',{
-        //     // name:'scrollToLine',
-        //     // args:[cursorPos.startLine+1]
-        //     name:'scrollIntoView',
-        //     args:[selectionInfo.endPosition]
-        // });
         await joplin.commands.execute('editor.execCommand', {
             name: 'cm-scrollToCursor' 
         });
-        // if(query_type=='chat' && !is_selection_exists){
-            // await joplin.commands.execute('editor.execCommand',{
-            //     name:'scrollToLine',
-            //     args:[100000000]
-            // });
-            /// 移动端似乎不支持上面的 ScrollIntoView，所以只能强制滚动到最后
-        // }
     }
     else{
         // 其他的不做任何事情
@@ -57,6 +34,9 @@ export async function scroll_to_view (mode:string='none') {
 export async function llmReplyStream({inp_str, lst_msg = [], 
     query_type='chat', is_selection_exists=true, str_before='', str_after=''}){
     //
+    console.log(inp_str);
+    console.log(lst_msg);
+    // ===============================================================
     // 读取设置的参数
     const llmSettingValues = await joplin.settings.values(['llmModel','llmServerUrl','llmKey',
         'llmModel2','llmServerUrl2','llmKey2', 'llmSelect',
@@ -76,6 +56,11 @@ export async function llmReplyStream({inp_str, lst_msg = [],
         apiUrl = String(llmSettingValues['llmServerUrl']) + '/chat/completions';
         apiKey = String(llmSettingValues['llmKey']);
     }
+    // 如果关键参数缺失，直接报错，不需要走后面的流程
+    if (apiModel.trim() === '' || apiUrl.trim() === '' || apiKey.trim() === '') {
+        alert(`ERROR 57: LLM url, key or model is empty!`);
+        return;
+    }
     // 高级参数
     let apiTemperature = llmSettingValues['llmTemperature'];
     apiTemperature = parseFloat(String(apiTemperature));
@@ -88,33 +73,25 @@ export async function llmReplyStream({inp_str, lst_msg = [],
     if (llmScrollType==1){platform = 'desktop'}
     else if (llmScrollType==2){platform = 'mobile'}
     else{platform = 'none'}
+    // 
+    // ===============================================================
+    // 实时更新笔记中的回复
+    // 
+    let result = ''
+    const insertContentToNote = async (new_text: string) => {
+        result += new_text; // 将新内容拼接到结果中
+        await joplin.commands.execute('insertText', new_text); // 插入最新内容到笔记
+        // await joplin.commands.execute('editor.execCommand', {name: 'cm-myInsertText', arguments:[new_text]});
+    };
     //
     // 光标移动到选区最末尾
     await joplin.commands.execute('editor.execCommand', {name: 'cm-moveCursorToSelectionEnd'});
-    /*
-    try{
-        let selectionEnd = await joplin.commands.execute('editor.execCommand', {
-            name: 'getCursor',
-            args: ['to'],
-        }); 
-        await joplin.commands.execute('editor.execCommand', {
-            name: 'setCursor',
-            args: [selectionEnd]
-        });
-    }
-    catch{ // 移动端不兼容的情况下，采用选区重写的方式实现类似效果
-        if (is_selection_exists) { // 如果有选中内容
-            await joplin.commands.execute('insertText', `${inp_str}`);
-        }
-    }
-    */
     //
     const chat_head = `Response from ${apiModel}:`;  // 不需要加粗
     const chat_tail = '**End of response**';
     //
     // 打印 chat_head
-    let result = `\n\n**${chat_head}**\n`;
-    await joplin.commands.execute('insertText', result);
+    await insertContentToNote(`\n\n**${chat_head}**\n`);
     // 
     // 构造对话列表
     let prompt_messages: OneMessage[] = [];
@@ -129,8 +106,8 @@ export async function llmReplyStream({inp_str, lst_msg = [],
         }
         prompt_messages.push({ role: 'system', content: prompt_head});
         prompt_messages.push({ role: 'user', content: inp_str });
-
     }
+    //
     // 构造请求体
     const requestBody = {
         model: apiModel, // 模型名称
@@ -160,12 +137,7 @@ export async function llmReplyStream({inp_str, lst_msg = [],
     // 解析流式响应
     const reader = response.body.getReader();
     const decoder = new TextDecoder('utf-8');
-    
-    // 实时更新笔记中的回复
-    const insertContentToNote = async (new_text: string) => {
-        result += new_text; // 将新内容拼接到结果中
-        await joplin.commands.execute('insertText', new_text); // 插入最新内容到笔记
-    };
+    //
     // 滚动条移动到光标位置
     await scroll_to_view(platform);
     //
@@ -177,8 +149,10 @@ export async function llmReplyStream({inp_str, lst_msg = [],
     while (true) {
         const { done, value } = await reader.read();
         if (done) break; // 流结束时退出循环
-        if (fail_count>=fail_count_max) break;  // 连续失败后退出
-
+        if (fail_count >= fail_count_max) {
+            alert('Sorry, something went wrong. Please check plugin logs for detail.')
+            break;  // 连续失败后退出
+        }
         // 解码并解析数据块
         const chunk:string = decoder.decode(value, { stream: true });
         console.info('Stream Chunk:', chunk);
@@ -230,7 +204,7 @@ export async function llmReplyStream({inp_str, lst_msg = [],
                     await scroll_to_view(platform);
                 } catch (err) {
                     console.warn('Failed to parse line:', trimmedLine, err);
-                    alert(`Failed to parse line: ${err}`);
+                    // alert(`Failed to parse line: ${err}`);
                     fail_count += 1;
                 }
             }
@@ -243,10 +217,10 @@ export async function llmReplyStream({inp_str, lst_msg = [],
         await insertContentToNote(output_str);
     }
     if (output_str.trim().endsWith(chat_tail)){
-        await joplin.commands.execute('insertText', '\n\n');
+        await insertContentToNote('\n\n');
     }
     else{
-        await joplin.commands.execute('insertText', `\n${chat_tail}\n\n`);
+        await insertContentToNote(`\n${chat_tail}\n\n`);
     }
     await scroll_to_view(platform);
     // await joplin.views.dialogs.showToast({message:'Finished successfully.', duration:5000, type:'success'});

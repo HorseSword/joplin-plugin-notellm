@@ -114,6 +114,17 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                 };
             }
             /**
+             * 输入文本。
+             */
+            function myInsertText(inp_str:string){
+                const editor = codeMirrorWrapper.editor;
+                const state = editor.state;
+                const cursorPos = state.selection.main.head;
+                editor.dispatch({
+                    changes: { from: cursorPos, insert: inp_str } // 在光标位置插入文本
+                });
+            }
+            /**
              * **注册 CodeMirror 命令**
              */
             codeMirrorWrapper.registerCommand("cm-getSelectionInfo", () => {
@@ -132,6 +143,9 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
             });
             codeMirrorWrapper.registerCommand("cm-getCursorPos", () => {
                 getCursorPos();
+            });
+            codeMirrorWrapper.registerCommand("cm-myInsertText", (inp_str) => {
+                myInsertText(inp_str);
             });
         },
     };

@@ -43,74 +43,6 @@ joplin.plugins.register({
 				str_after: selectionInfo.afterText
 			}
 		}
-		async function split_note_by_selection_old(split_char:string='@TODO') {
-			let is_selection_exists = false;
-			let content:string = await joplin.commands.execute('editor.execCommand', {
-				name: 'getValue',
-			}); // 获取文档内容 // 这种写法在手机端不兼容
-			if (typeof content ==='string'){
-				let lines = content.split('\n'); // 按行分割文档内容
-				//
-				// 选中部分
-				const selectedText = await joplin.commands.execute('selectedText');
-				
-				if (!selectedText || selectedText.trim() === '') { // 如果没有选中内容
-					is_selection_exists = false;
-				}
-				else{
-					is_selection_exists = true;
-				}
-				//
-				// 选中前面部分
-				let selectionStart = await joplin.commands.execute('editor.execCommand', {
-					name: 'getCursor',
-					args: ['from'],
-				}); // 获取选中起点光标位置
-				let beforeSelection = lines.slice(0, selectionStart.line).join('\n') + '\n' + lines[selectionStart.line].slice(0, selectionStart.ch);
-				//
-				// 选中后面部分
-				let selectionEnd = await joplin.commands.execute('editor.execCommand', {
-					name: 'getCursor',
-					args: ['to'],
-				}); // 获取选中结束光标位置
-				let afterSelection = lines[selectionEnd.line].slice(selectionEnd.ch) + '\n' + lines.slice(selectionEnd.line + 1).join('\n');
-				//
-				return {is_selection_exists:is_selection_exists, 
-					str_before:beforeSelection, 
-					str_selected: selectedText, 
-					str_after:afterSelection
-				}
-			}
-			else{
-				let tmp_note = await joplin.workspace.selectedNote()
-				let content = tmp_note.body // 移动端兼容写法
-				let lines = content.split('\n'); // 按行分割文档内容
-				//
-				// 选中部分
-				const selectedText = await joplin.commands.execute('selectedText');
-				
-				if (!selectedText || selectedText.trim() === '') { // 如果没有选中内容
-					is_selection_exists = false;
-				}
-				else{
-					is_selection_exists = true;
-				}
-				//
-				// 选中前面部分
-				let beforeSelection = content;
-				if (is_selection_exists){
-					beforeSelection = '';
-				}
-				//
-				// 选中后面部分
-				let afterSelection = ''
-				return {is_selection_exists:is_selection_exists, 
-					str_before:beforeSelection, 
-					str_selected: selectedText, 
-					str_after:afterSelection
-				}
-			}
-		}
 		//
 		// 摘要
 		await joplin.commands.register({
@@ -121,6 +53,12 @@ joplin.plugins.register({
 				try {
 					// 读取选中的内容：
 					let dict_selection = await split_note_by_selection();
+					// 
+					// 判断是否在markdown模式
+					if (typeof(await joplin.commands.execute('editor.execCommand', { name: 'cm-getSelectionInfo' })) === 'boolean'){
+						alert('ERROR 124: Maybe you are not in markdown mode?');
+						return;
+					}
 					if (dict_selection.is_selection_exists){
 						let prompt_messages = []
 						prompt_messages.push({ role: 'system', content: dict_selection.str_selected});
@@ -167,6 +105,12 @@ joplin.plugins.register({
 					let user_command = ''
 					// 读取选中的内容：
 					let dict_selection = await split_note_by_selection();
+					// 
+					// 判断是否在markdown模式
+					if (typeof(await joplin.commands.execute('editor.execCommand', { name: 'cm-getSelectionInfo' })) === 'boolean'){
+						alert('ERROR 124: Maybe you are not in markdown mode?');
+						return;
+					}					
 					if (dict_selection.is_selection_exists){
 						let prompt_messages = []
 						prompt_messages.push({ role: 'system', content: '你的任务是帮助用户完善文档。'});
@@ -210,6 +154,12 @@ joplin.plugins.register({
 				try {
 					// 读取选中的内容：
 					let dict_selection = await split_note_by_selection();
+					// 
+					// 判断是否在markdown模式
+					if (typeof(await joplin.commands.execute('editor.execCommand', { name: 'cm-getSelectionInfo' })) === 'boolean'){
+						alert('ERROR 124: Maybe you are not in markdown mode?');
+						return;
+					}
 					if (dict_selection.is_selection_exists){
 						let prompt_messages = []
 						prompt_messages.push({ role: 'system', content: '接下来用户会针对选中的部分提问。'});
@@ -254,6 +204,12 @@ joplin.plugins.register({
 			execute:async()=>{
 				try {
 					let dict_selection = await split_note_by_selection();
+					// 
+					// 判断是否在markdown模式
+					if (typeof(await joplin.commands.execute('editor.execCommand', { name: 'cm-getSelectionInfo' })) === 'boolean'){
+						alert('ERROR 124: Maybe you are not in markdown mode?');
+						return;
+					}
 					if (dict_selection.is_selection_exists){
 						await llmReplyStream({inp_str:dict_selection.str_selected, 
 							query_type:'chat', 
