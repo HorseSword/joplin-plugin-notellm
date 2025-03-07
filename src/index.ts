@@ -48,14 +48,6 @@ joplin.plugins.register({
 			}
 		}
 		await joplin.commands.register({
-			name: 'quickChangeLLM0',
-			label: 'Change LLM',
-			iconName: 'fas fa-robot',
-			execute: async () => {
-				await changeLLM();
-			}
-		});
-		await joplin.commands.register({
 			name: 'quickChangeLLM1',
 			label: dictText['switch_to_LLM1'], // 'Switch to LLM 1',
 			iconName: 'fas fa-robot',
@@ -75,7 +67,7 @@ joplin.plugins.register({
 		// 摘要
 		await joplin.commands.register({
 			name: 'askLLMSummary',
-			label: 'Summarize selection (or above cursor)',
+			label: dictText['summary_label'],// 'Summarize selection (or above cursor)',
 			iconName: 'fas fa-robot',
 			execute: async () => {
 				try {
@@ -125,7 +117,7 @@ joplin.plugins.register({
 		 */
 		await joplin.commands.register({
 			name: 'askLLMImprove',
-			label: 'Improve selection (context related)',
+			label: dictText['improve_label'], //'Improve selection (context related)',
 			iconName: 'fas fa-hands-helping',
 			execute:async()=>{
 				try {
@@ -176,7 +168,7 @@ joplin.plugins.register({
 		 */
 		await joplin.commands.register({
 			name: 'askLLMSelected',
-			label: 'Ask about selection',
+			label: dictText['ask_label'],// 'Ask about selection',
 			iconName: 'fas fa-robot',
 			execute:async()=>{
 				try {
@@ -227,7 +219,7 @@ joplin.plugins.register({
 		 */
 		await joplin.commands.register({
 			name: 'askLLMChat',
-			label: 'Chat and reply (above cursor)',
+			label: dictText['chat_label'], //'Chat and reply (above cursor)',
 			iconName: 'fas fa-comments',
 			execute:async()=>{
 				try {

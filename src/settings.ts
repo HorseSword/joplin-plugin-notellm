@@ -17,10 +17,10 @@ export async function registerSettings(): Promise<void> {
   
     await joplin.settings.registerSettings({
 
-      llmSelect: { // Temperature
+      llmSelect: { 
         type: SettingItemType.Int,
         value: 1,
-        label: 'LLM select',
+        label: dictText['select_llm_label'], // 'LLM select',
         description: dictText['select_llm_desc'], // 'Which LLM do you want to use?',
         section: 'notellm.settings',
         public: true,
@@ -34,7 +34,7 @@ export async function registerSettings(): Promise<void> {
       llmServerUrl: {
         type: SettingItemType.String,
         value: 'https://api.deepseek.com/v1',
-        label: 'LLM server url',
+        label: dictText['url_llm1_label'], //'LLM server url',
         description: dictText['url_llm1_desc'], // 'The 1st LLM server URL, e.g. https://api.deepseek.com/v1',
         section: 'notellm.settings',
         public: true,
@@ -43,8 +43,8 @@ export async function registerSettings(): Promise<void> {
       llmModel: {
         type: SettingItemType.String,
         value: 'deepseek-chat',
-        label: 'LLM model name',
-        description: 'The 1st LLM Model Name, e.g. moonshot-v1-8k, deepseek-chat',
+        label: dictText['model_llm1_label'],//'LLM model name',
+        description: dictText['model_llm1_desc'],
         section: 'notellm.settings',
         public: true,
         advanced: false,
@@ -53,8 +53,8 @@ export async function registerSettings(): Promise<void> {
       llmKey: {
         type: SettingItemType.String,
         value: '',
-        label: 'LLM key',
-        description: 'API-key for LLM 1.',
+        label: dictText['key_llm1_label'], // 'LLM key',
+        description: dictText['key_llm1_desc'], //'API-key for LLM 1.',
         section: 'notellm.settings',
         public: true,
         advanced: false,
@@ -63,8 +63,8 @@ export async function registerSettings(): Promise<void> {
       llmExtra: {
         type: SettingItemType.String,
         value: '',
-        label: 'Extra config for LLM 1 (Optional)',
-        description: 'The 1st LLM Model extra config in json format, e.g. {"key1":"value1", "key2":"value2"}. This will cover current config by key.',
+        label: dictText['extra_llm1_label'],
+        description: dictText['extra_llm1_desc'],// 'The 1st LLM Model extra config in json format, e.g. {"key1":"value1", "key2":"value2"}. This will cover current config by key.',
         section: 'notellm.settings',
         public: true,
         advanced: true,
@@ -73,8 +73,8 @@ export async function registerSettings(): Promise<void> {
       llmServerUrl2: {
         type: SettingItemType.String,
         value: 'https://api.deepseek.com/v1',
-        label: 'The 2nd LLM server url',
-        description: 'The 2nd LLM server URL (optional).',
+        label: dictText['url_llm2_label'],//'The 2nd LLM server url',
+        description: dictText['url_llm2_desc'], //'The 2nd LLM server URL (optional).',
         section: 'notellm.settings',
         public: true,
         advanced: false,
@@ -82,8 +82,8 @@ export async function registerSettings(): Promise<void> {
       llmModel2: {
         type: SettingItemType.String,
         value: 'deepseek-chat',
-        label: 'The 2nd LLM model',
-        description: 'The 2nd LLM Model Name (optional).',
+        label: dictText['model_llm2_label'],//'The 2nd LLM model',
+        description: dictText['model_llm2_desc'],//'The 2nd LLM Model Name (optional).',
         section: 'notellm.settings',
         public: true,
         advanced: false,
@@ -92,8 +92,8 @@ export async function registerSettings(): Promise<void> {
       llmKey2: {
         type: SettingItemType.String,
         value: '',
-        label: 'The 2nd LLM key',
-        description: 'API key for the 2nd LLM (optional)',
+        label: dictText['key_llm2_label'], //'The 2nd LLM key',
+        description: dictText['key_llm2_desc'], // 'API key for the 2nd LLM (optional)',
         section: 'notellm.settings',
         public: true,
         advanced: false,
@@ -102,8 +102,8 @@ export async function registerSettings(): Promise<void> {
       llmExtra2: {
         type: SettingItemType.String,
         value: '',
-        label: 'Extra config for LLM 2 (Optional)',
-        description: 'The 2nd LLM Model extra config in json format, e.g. {"key1":"value1", "key2":"value2"}. This will cover current config by key.',
+        label: dictText['extra_llm2_label'],  // 'Extra config for LLM 2 (Optional)',
+        description: dictText['extra_llm2_desc'],  // 'The 2nd LLM Model extra config in json format, e.g. {"key1":"value1", "key2":"value2"}. This will cover current config by key.',
         section: 'notellm.settings',
         public: true,
         advanced: true,
@@ -113,34 +113,34 @@ export async function registerSettings(): Promise<void> {
       llmScrollType: { // Temperature
         type: SettingItemType.Int,
         value: 1,
-        label: 'Scroll type',
-        description: 'Scroll type of screen while streaming.',
+        label: dictText['scroll_type_label'],  // 'Scroll type',
+        description: dictText['scroll_type_desc'],  // 'Scroll type of screen while streaming.',
         section: 'notellm.settings',
         public: true,
         advanced: false,
         isEnum:true,
         options: {
-          0: 'None',
-          1: 'Type 1: in view',
-          2: 'Type 2: keep center'
+          0: dictText['scroll_type_type0'],  // 'None',
+          1: dictText['scroll_type_type1'],  // 'Type 1: in view',
+          2: dictText['scroll_type_type2']  // 'Type 2: keep center'
         }
       },
       llmTemperature: { // Temperature
         type: SettingItemType.String,
         value: '0.1',
-        description: '0 <= Temperature <1',
+        label: dictText['temperature_label'],  // 'llm temperature',
+        description: dictText['temperature_desc'],  // '0 <= Temperature <1',
         section: 'notellm.settings',
         public: true,
-        label: 'llm temperature',
         advanced: true,
       },
       llmMaxTokens: { // length
         type: SettingItemType.String,
         value: 1024,
-        description: 'Num of max tokens. e.g. 1024, 2048, 4096.',
+        label: dictText['max_tokens_label'],  // 'llm max tokens.',
+        description: dictText['max_tokens_desc'],
         section: 'notellm.settings',
         public: true,
-        label: 'llm max tokens.',
         advanced: true,
       },
       llmMaxInputLength: { // length
