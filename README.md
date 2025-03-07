@@ -12,7 +12,7 @@ To be your very own AI-powered note plugin for Joplin. It's completely open-sour
 - **Question & Answer**: Generate answers to questions based on selected text.
 - **Chat Functionality**: Engage in conversations with AI based on all preceding content up to your cursor position, providing real-time assistance for writing.
 
-### Mobile Support
+## Mobile Support
 
 Currently, mobile users can enjoy the chat functionality over the entire note text. 
 
@@ -21,7 +21,9 @@ Others functions are under development.
 ## Usage Instructions
 
 **This plugin can only work in markdown editor!!!!**
+
 **This plugin can only work in markdown editor!!!!**
+
 **This plugin can only work in markdown editor!!!!**
 
 After installing this plugin, you should go to settings to configure your ai options. At least input one URL, API key, and model name.

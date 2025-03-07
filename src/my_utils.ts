@@ -38,23 +38,26 @@ export async function llmReplyStream({inp_str, lst_msg = [],
     console.log(lst_msg);
     // ===============================================================
     // 读取设置的参数
-    const llmSettingValues = await joplin.settings.values(['llmModel','llmServerUrl','llmKey',
-        'llmModel2','llmServerUrl2','llmKey2', 'llmSelect',
+    const llmSettingValues = await joplin.settings.values(['llmModel','llmServerUrl','llmKey','llmExtra',
+        'llmModel2','llmServerUrl2','llmKey2','llmExtra2',
+        'llmSelect',
         'llmTemperature','llmMaxTokens','llmScrollType']);
     // 基础参数
     let llmSelect = llmSettingValues['llmSelect'];
     llmSelect = parseInt(String(llmSelect));
     //
-    let apiModel = '', apiUrl = '', apiKey = '';
+    let apiModel = '', apiUrl = '', apiKey = '', extraConfig;
     if(llmSelect==2){
         apiModel = String(llmSettingValues['llmModel2']);
         apiUrl = String(llmSettingValues['llmServerUrl2']) + '/chat/completions';
         apiKey = String(llmSettingValues['llmKey2']);
+        extraConfig = String(llmSettingValues['llmExtra2']);
     }
     else{
         apiModel = String(llmSettingValues['llmModel']);
         apiUrl = String(llmSettingValues['llmServerUrl']) + '/chat/completions';
         apiKey = String(llmSettingValues['llmKey']);
+        extraConfig = String(llmSettingValues['llmExtra']);
     }
     // 如果关键参数缺失，直接报错，不需要走后面的流程
     if (apiModel.trim() === '' || apiUrl.trim() === '' || apiKey.trim() === '') {
@@ -109,13 +112,23 @@ export async function llmReplyStream({inp_str, lst_msg = [],
     }
     //
     // 构造请求体
-    const requestBody = {
+    let requestBody = {
         model: apiModel, // 模型名称
         messages:prompt_messages,
         stream: true, // 启用流式输出
         temperature: apiTemperature,
         max_tokens: apiMaxTokens,
     };
+    try{
+        if(extraConfig.trim().length>0){
+            let newConfig = JSON.parse(extraConfig);
+            requestBody = {...requestBody, ...newConfig};
+        }
+        console.log(JSON.stringify(requestBody));
+    }
+    catch(err){
+        console.warn('JSON parse failed:', err);
+    }
     //
     // 发起 HTTP 请求
     const response = await fetch(apiUrl, {
@@ -225,4 +238,30 @@ export async function llmReplyStream({inp_str, lst_msg = [],
     await scroll_to_view(platform);
     // await joplin.views.dialogs.showToast({message:'Finished successfully.', duration:5000, type:'success'});
     await (joplin.views.dialogs as any).showToast({message:'Response finished.', duration:2500+(Date.now()%500), type:'success',timestamp: Date.now()});
+}
+
+export async function changeLLM(llm_no=0) {
+    let int_target_llm=0;
+    if (llm_no!=0){
+        int_target_llm = llm_no;
+    }
+    else{
+        let current_llm = await joplin.settings.values(['llmSelect']);
+        let int_current_llm = parseInt(String(current_llm['llmSelect']));
+        if(int_current_llm==1){
+            int_target_llm = 2
+        }
+        else{
+            int_target_llm = 1
+        }
+    }
+    console.log(int_target_llm);
+    //
+    await joplin.settings.setValue('llmSelect', int_target_llm);
+    await (joplin.views.dialogs as any).showToast({
+        message:`LLM ${int_target_llm} selected!`, 
+        duration: 2500+(Date.now()%500), 
+        type:'success',
+        timestamp: Date.now()
+    }); 
 }

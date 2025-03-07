@@ -1,23 +1,27 @@
 import { SettingItemSubType, SettingItemType } from 'api/types';
 import joplin from '../api';
+import {getTxt} from './texts';
 
 export function pluginIconName(): string {
   return 'fas fa-robot';
 }
 
 export async function registerSettings(): Promise<void> {
+    const locale = await joplin.settings.globalValue('locale');
+    let dictText = getTxt(locale);
+    //
     await joplin.settings.registerSection('notellm.settings', {
       label: 'LLM settings',
       iconName: pluginIconName(),
     });
   
     await joplin.settings.registerSettings({
-      
+
       llmSelect: { // Temperature
         type: SettingItemType.Int,
         value: 1,
         label: 'LLM select',
-        description: 'Which LLM do you want to use?',
+        description: dictText['select_llm_desc'], // 'Which LLM do you want to use?',
         section: 'notellm.settings',
         public: true,
         advanced: false,
@@ -31,7 +35,7 @@ export async function registerSettings(): Promise<void> {
         type: SettingItemType.String,
         value: 'https://api.deepseek.com/v1',
         label: 'LLM server url',
-        description: 'The 1st LLM server URL, e.g. https://api.deepseek.com/v1',
+        description: dictText['url_llm1_desc'], // 'The 1st LLM server URL, e.g. https://api.deepseek.com/v1',
         section: 'notellm.settings',
         public: true,
         advanced: false,
@@ -56,6 +60,16 @@ export async function registerSettings(): Promise<void> {
         advanced: false,
         secure: true, // 密码输入框
       },
+      llmExtra: {
+        type: SettingItemType.String,
+        value: '',
+        label: 'Extra config for LLM 1 (Optional)',
+        description: 'The 1st LLM Model extra config in json format, e.g. {"key1":"value1", "key2":"value2"}. This will cover current config by key.',
+        section: 'notellm.settings',
+        public: true,
+        advanced: true,
+      },
+      //
       llmServerUrl2: {
         type: SettingItemType.String,
         value: 'https://api.deepseek.com/v1',
@@ -84,6 +98,15 @@ export async function registerSettings(): Promise<void> {
         public: true,
         advanced: false,
         secure: true, // 密码输入框
+      },
+      llmExtra2: {
+        type: SettingItemType.String,
+        value: '',
+        label: 'Extra config for LLM 2 (Optional)',
+        description: 'The 2nd LLM Model extra config in json format, e.g. {"key1":"value1", "key2":"value2"}. This will cover current config by key.',
+        section: 'notellm.settings',
+        public: true,
+        advanced: true,
       },
       // 高级选项
       //

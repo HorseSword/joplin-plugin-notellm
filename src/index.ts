@@ -1,7 +1,9 @@
 import joplin from 'api';
 import {ToolbarButtonLocation, ContentScriptType, MenuItemLocation } from 'api/types';
 import { registerSettings, pluginIconName } from './settings';
-import {llmReplyStream} from './my_utils';
+import {llmReplyStream, changeLLM} from './my_utils';
+import {getTxt} from './texts';
+
 // import {llmReplyStream} from './my_openai_utils';
 
 // import OpenAI from "openai";
@@ -11,6 +13,8 @@ joplin.plugins.register({
 	onStart: async function() {
 		console.info('Hello world. NoteLLM plugin started!');
 		let platform = 'desktop';
+		const locale = await joplin.settings.globalValue('locale');
+		let dictText = getTxt(locale);
 		//
 		const contentScriptId = 'some-content-script-id';
         joplin.contentScripts.register(
@@ -43,6 +47,30 @@ joplin.plugins.register({
 				str_after: selectionInfo.afterText
 			}
 		}
+		await joplin.commands.register({
+			name: 'quickChangeLLM0',
+			label: 'Change LLM',
+			iconName: 'fas fa-robot',
+			execute: async () => {
+				await changeLLM();
+			}
+		});
+		await joplin.commands.register({
+			name: 'quickChangeLLM1',
+			label: dictText['switch_to_LLM1'], // 'Switch to LLM 1',
+			iconName: 'fas fa-robot',
+			execute: async () => {
+				await changeLLM(1);
+			}
+		});
+		await joplin.commands.register({
+			name: 'quickChangeLLM2',
+			label: dictText['switch_to_LLM2'],
+			iconName: 'fas fa-robot',
+			execute: async () => {
+				await changeLLM(2);
+			}
+		});
 		//
 		// 摘要
 		await joplin.commands.register({
@@ -257,6 +285,14 @@ joplin.plugins.register({
 				label: 'askLLM_Chat',
 				commandName: 'askLLMChat', // 绑定的命令
 				accelerator: 'Alt+C', // 可选快捷键
+			  },
+			  {
+				label: 'Switch_to_LLM_1',
+				commandName: 'quickChangeLLM1', // 绑定的命令
+			  },
+			  {
+				label: 'Switch_to_LLM_2',
+				commandName: 'quickChangeLLM2', // 绑定的命令
 			  },
 			],
 			MenuItemLocation.Tools // 菜单位置：添加到“工具”菜单
