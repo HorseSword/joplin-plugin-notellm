@@ -121,8 +121,6 @@ joplin.plugins.register({
 			iconName: 'fas fa-hands-helping',
 			execute:async()=>{
 				try {
-					// 弹窗 TODO
-					let user_command = ''
 					// 读取选中的内容：
 					let dict_selection = await split_note_by_selection();
 					// 
@@ -130,26 +128,30 @@ joplin.plugins.register({
 					if (typeof(await joplin.commands.execute('editor.execCommand', { name: 'cm-getSelectionInfo' })) === 'boolean'){
 						alert('ERROR 124: Maybe you are not in markdown mode?');
 						return;
-					}					
-					const dialogs = joplin.views.dialogs;
-					const handle_question = await dialogs.create(`${Date.now()}`);
-					await dialogs.setHtml(handle_question, `
-						<p>Your command?</p>
-						<form name="question">
-							<textarea name="desc" autofocus style="width:95%"></textarea>
-						</form>
-						`);
-					const result_of_question = await dialogs.open(handle_question);
-					user_command = result_of_question.formData.question.desc;
-					if (result_of_question.id != 'ok'){
-						return
-					}
-					else if (user_command.length<=0){
-						alert('Please input your command.');
-						return
-					}
+					}			
 					//
-					if (dict_selection.is_selection_exists){
+					if (dict_selection.is_selection_exists){	
+						//	
+						// 获得用户输入
+						const dialogs = joplin.views.dialogs;
+						const handle_question = await dialogs.create(`${Date.now()}`);
+						await dialogs.setHtml(handle_question, `
+							<p>Your command?</p>
+							<form name="question">
+								<textarea name="desc" autofocus style="width:95%"></textarea>
+							</form>
+							`);
+						const result_of_question = await dialogs.open(handle_question);
+						let user_command = ''
+						user_command = result_of_question.formData.question.desc;
+						if (result_of_question.id != 'ok'){
+							return
+						}
+						else if (user_command.length<=0){
+							alert('Please input your command.');
+							return
+						}
+						//
 						let prompt_messages = []
 						prompt_messages.push({ role: 'system', content: '你的任务是帮助用户完善文档。'});
 						if (dict_selection.str_before.length>0){
@@ -198,25 +200,27 @@ joplin.plugins.register({
 						alert('ERROR 124: Maybe you are not in markdown mode?');
 						return;
 					}
-					// 获取用户的提问内容
-					const dialogs = joplin.views.dialogs;
-					const handle_question = await dialogs.create(`${Date.now()}`);
-					await dialogs.setHtml(handle_question, `
-						<p>Your question?</p>
-						<form name="question">
-							<textarea name="desc" autofocus style="width:95%"></textarea>
-						</form>
-						`);
-					const result_of_question = await dialogs.open(handle_question);
-					if (result_of_question.id != 'ok'){
-						return
-					}
-					else if (result_of_question.formData.question.desc.length<=0){
-						alert('No text.');
-						return
-					}
 					//
 					if (dict_selection.is_selection_exists){
+						//
+						// 获取用户的提问内容
+						const dialogs = joplin.views.dialogs;
+						const handle_question = await dialogs.create(`${Date.now()}`);
+						await dialogs.setHtml(handle_question, `
+							<p>Your question?</p>
+							<form name="question">
+								<textarea name="desc" autofocus style="width:95%"></textarea>
+							</form>
+							`);
+						const result_of_question = await dialogs.open(handle_question);
+						if (result_of_question.id != 'ok'){
+							return
+						}
+						else if (result_of_question.formData.question.desc.length<=0){
+							alert('No text.');
+							return
+						}
+						//
 						let prompt_messages = []
 						prompt_messages.push({ role: 'system', content: '接下来用户会针对选中的部分提问。'});
 						if (dict_selection.str_before.length>0){
