@@ -131,6 +131,24 @@ joplin.plugins.register({
 						alert('ERROR 124: Maybe you are not in markdown mode?');
 						return;
 					}					
+					const dialogs = joplin.views.dialogs;
+					const handle_question = await dialogs.create(`${Date.now()}`);
+					await dialogs.setHtml(handle_question, `
+						<p>Your command?</p>
+						<form name="question">
+							<textarea name="desc" autofocus style="width:95%"></textarea>
+						</form>
+						`);
+					const result_of_question = await dialogs.open(handle_question);
+					user_command = result_of_question.formData.question.desc;
+					if (result_of_question.id != 'ok'){
+						return
+					}
+					else if (user_command.length<=0){
+						alert('Please input your command.');
+						return
+					}
+					//
 					if (dict_selection.is_selection_exists){
 						let prompt_messages = []
 						prompt_messages.push({ role: 'system', content: '你的任务是帮助用户完善文档。'});
@@ -145,7 +163,7 @@ joplin.plugins.register({
 							prompt_messages.push({role:'user',content:`<text_after_selection>\n\n${dict_selection.str_after}\n\n</text_after_selection>`});
 						}
 						prompt_messages.push({ role: 'user', 
-							content: `请参考前后文及其关联关系，按用户要求，修改'text_selected'部分。请注意不要修改其余部分。请直接回复'text_selected'部分的最终结果，不需要额外的文字，不需要抄写 text_before_selection 或 text_after_selection。`
+							content: `请帮助用户完善文档。参考前后文及其关联关系，按'command'部分的要求，改进'text_selected'部分的文本表达。请直接回复最终结果，不需要额外的文字，严禁修改其余任何部分。不需要抄写 text_before_selection 或 text_after_selection。`
 						});
 						await llmReplyStream({inp_str:dict_selection.str_selected,
 							query_type:'improve',
@@ -164,7 +182,7 @@ joplin.plugins.register({
 			}
 		})
 		/**
-		 * improve：选中部分提问。
+		 * ask： 针对选中部分提问。
 		 */
 		await joplin.commands.register({
 			name: 'askLLMSelected',
@@ -180,18 +198,40 @@ joplin.plugins.register({
 						alert('ERROR 124: Maybe you are not in markdown mode?');
 						return;
 					}
+					// 获取用户的提问内容
+					const dialogs = joplin.views.dialogs;
+					const handle_question = await dialogs.create(`${Date.now()}`);
+					await dialogs.setHtml(handle_question, `
+						<p>Your question?</p>
+						<form name="question">
+							<textarea name="desc" autofocus style="width:95%"></textarea>
+						</form>
+						`);
+					const result_of_question = await dialogs.open(handle_question);
+					if (result_of_question.id != 'ok'){
+						return
+					}
+					else if (result_of_question.formData.question.desc.length<=0){
+						alert('No text.');
+						return
+					}
+					//
 					if (dict_selection.is_selection_exists){
 						let prompt_messages = []
 						prompt_messages.push({ role: 'system', content: '接下来用户会针对选中的部分提问。'});
 						if (dict_selection.str_before.length>0){
 							prompt_messages.push({role:'user',content:`<text_before_selection>\n\n${dict_selection.str_before}\n\n</text_before_selection>`});
 						}
+						//
 						prompt_messages.push({ role: 'user', content: `<text_selected>\n\n${dict_selection.str_selected}\n\n</text_selected>`});
+						let str_command = result_of_question.formData.question.desc;
+						prompt_messages.push({role:'user',content:`<user_command>\n\n${str_command}\n\n</user_command>`});
+						//
 						if (dict_selection.str_after.length>0){
 							prompt_messages.push({role:'user',content:`<text_after_selection>\n\n${dict_selection.str_after}\n\n</text_after_selection>`});
 						}
 						prompt_messages.push({ role: 'user', 
-							content: `任务说明: 上下文仅供参考。请参考前后文及其关联关系，按用户要求，回复用户在 “text_selected” 部分提供的内容。请直接回复“text_selected”的最终结果，不需要抄写 text_before_selection 或 text_after_selection。`
+							content: `任务说明: 请参考前后文及其关联关系，针对 “text_selected” 部分提供的内容，回复用户在"user_command"所提出的问题。请直接回复最终结果，不需要抄写 text_before_selection 或 text_after_selection。`
 						});
 						await llmReplyStream({inp_str:dict_selection.str_selected,
 							query_type:'ask',
@@ -258,6 +298,12 @@ joplin.plugins.register({
 			'askLLM_menus', // 菜单项 ID
 			'Note_LLM', // 菜单项名称
 			[
+			  
+			  {
+				label: 'askLLM_Chat',
+				commandName: 'askLLMChat', // 绑定的命令
+				accelerator: 'Alt+C', // 可选快捷键
+			  },
 			  {
 				label: 'askLLM_Summary',
 				commandName: 'askLLMSummary', // 绑定的命令
@@ -272,11 +318,6 @@ joplin.plugins.register({
 				label: 'askLLM_Selected',
 				commandName: 'askLLMSelected', // 绑定的命令
 				accelerator: 'Alt+Q', // 可选快捷键
-			  },
-			  {
-				label: 'askLLM_Chat',
-				commandName: 'askLLMChat', // 绑定的命令
-				accelerator: 'Alt+C', // 可选快捷键
 			  },
 			  {
 				label: 'Switch_to_LLM_1',
