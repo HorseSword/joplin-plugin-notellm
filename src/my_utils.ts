@@ -119,6 +119,7 @@ export async function llmReplyStream({inp_str, lst_msg = [],
         temperature: apiTemperature,
         max_tokens: apiMaxTokens,
     };
+    // 根据自定义设置，覆盖修改现有的配置项
     try{
         if(extraConfig.trim().length>0){
             let newConfig = JSON.parse(extraConfig);
@@ -159,6 +160,7 @@ export async function llmReplyStream({inp_str, lst_msg = [],
     let need_add_head = true;
     let fail_count = 0
     const fail_count_max = 3
+    //
     while (true) {
         const { done, value } = await reader.read();
         if (done) break; // 流结束时退出循环
@@ -180,7 +182,7 @@ export async function llmReplyStream({inp_str, lst_msg = [],
                 }
 
                 // 处理 "data:" 前缀
-                const jsonString = trimmedLine.replace(/^data: /, ''); // 去掉 "data: " 前缀
+                const jsonString = trimmedLine.replace(/^data:/, ''); // 去掉 "data:" 前缀
 
                 // 特殊情况：处理流结束的标志 "data: [DONE]"
                 if (jsonString === '[DONE]') {

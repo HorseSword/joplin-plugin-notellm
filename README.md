@@ -43,6 +43,7 @@ And, in the top menu under Tools / NoteLLM, find quick access to all functions. 
 
 ## UPDATE LOGS
 
+- v0.4.5, 2025-03-09. Bug fixed.
 - v0.4.4, 2025-03-08. Add dialogs for ask and improve.
 - v0.4.3, 2025-03-07. Multi-language (Simplified Chinese) supported.
 - v0.4.2, 2025-03-06. LLMs can change by menu.
