@@ -171,7 +171,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     catch(err){  // 这里如果出错，最可能的是CORS限制。此时得到的response是空对象。
         if (err.message.includes('Failed to fetch')){
             console.error('Error 173:', err);
-            alert(`Error 173: ${err}. This caused by your network or LLM server CORS.`);
+            alert(`Error 173: ${err}. \nThis is (1) network error, or (2) LLM server CORS.`);
         }
         else{
             console.error('Error 177:',err);
