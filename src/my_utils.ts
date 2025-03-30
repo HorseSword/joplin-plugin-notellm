@@ -169,8 +169,14 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         }
     }
     catch(err){  // 这里如果出错，最可能的是CORS限制。此时得到的response是空对象。
-        console.error('Error 167:',err);
-        alert(`ERROR 167: ${err} \n response = ${response}.`);
+        if (err.message.includes('Failed to fetch')){
+            console.error('Error 173:', err);
+            alert(`Error 173: ${err}. This caused by your network or LLM server CORS.`);
+        }
+        else{
+            console.error('Error 177:',err);
+            alert(`ERROR 177: ${err} \n response = ${response}.`);
+        }
         return;
     }   
     // 解析流式响应
