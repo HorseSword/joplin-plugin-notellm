@@ -31,17 +31,20 @@ export async function scroll_to_view (mode:string='none') {
  * 
  * 这个函数的作用是，根据传入的文本，流式返回结果。
  */
-export async function llmReplyStream({inp_str, lst_msg = [], 
-    query_type='chat', is_selection_exists=true, str_before='', str_after=''}){
+export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
+    is_selection_exists=true, str_before='', str_after=''}){
     //
     console.log(inp_str);
     console.log(lst_msg);
     // ===============================================================
     // 读取设置的参数
-    const llmSettingValues = await joplin.settings.values(['llmModel','llmServerUrl','llmKey','llmExtra',
+    const llmSettingValues = await joplin.settings.values([
+        'llmModel','llmServerUrl','llmKey','llmExtra',
         'llmModel2','llmServerUrl2','llmKey2','llmExtra2',
+        'llmModel3','llmServerUrl3','llmKey3','llmExtra3',
         'llmSelect',
-        'llmTemperature','llmMaxTokens','llmScrollType']);
+        'llmTemperature','llmMaxTokens','llmScrollType'
+    ]);
     // 基础参数
     let llmSelect = llmSettingValues['llmSelect'];
     llmSelect = parseInt(String(llmSelect));
@@ -52,6 +55,12 @@ export async function llmReplyStream({inp_str, lst_msg = [],
         apiUrl = String(llmSettingValues['llmServerUrl2']) + '/chat/completions';
         apiKey = String(llmSettingValues['llmKey2']);
         extraConfig = String(llmSettingValues['llmExtra2']);
+    }
+    else if(llmSelect==3){
+        apiModel = String(llmSettingValues['llmModel3']);
+        apiUrl = String(llmSettingValues['llmServerUrl3']) + '/chat/completions';
+        apiKey = String(llmSettingValues['llmKey3']);
+        extraConfig = String(llmSettingValues['llmExtra3']);
     }
     else{
         apiModel = String(llmSettingValues['llmModel']);
@@ -77,6 +86,10 @@ export async function llmReplyStream({inp_str, lst_msg = [],
     else if (llmScrollType==2){platform = 'mobile'}
     else{platform = 'none'}
     // 
+    //
+    const chat_head = `Response from ${apiModel}:`;  // 不需要加粗
+    const chat_tail = '**End of response**';
+    //
     // ===============================================================
     // 实时更新笔记中的回复
     // 
@@ -90,14 +103,13 @@ export async function llmReplyStream({inp_str, lst_msg = [],
     // 光标移动到选区最末尾
     await joplin.commands.execute('editor.execCommand', {name: 'cm-moveCursorToSelectionEnd'});
     //
-    const chat_head = `Response from ${apiModel}:`;  // 不需要加粗
-    const chat_tail = '**End of response**';
-    //
     // 打印 chat_head
     await insertContentToNote(`\n\n**${chat_head}**\n`);
+    // 滚动条移动到光标位置
+    await scroll_to_view(platform);
     // 
     // 构造对话列表
-    let prompt_messages: OneMessage[] = [];
+    let prompt_messages = [];
     // 如果有传入的，直接使用
     if (lst_msg.length>0){ 
         prompt_messages = lst_msg;
@@ -132,46 +144,55 @@ export async function llmReplyStream({inp_str, lst_msg = [],
     }
     //
     // 发起 HTTP 请求
-    const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
+    let response;
+    try{
+        let dict_headers = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`, // 设置 API 密钥
-        },
-        body: JSON.stringify(requestBody), // 将请求体序列化为 JSON
-    });
-
-    // 检查 HTTP 响应状态
-    if (!response.ok || !response.body) {
-        const errorText = await response.text();
-        console.error('Error from LLM API:', errorText);
-        alert(`ERROR 156: ${response.status} ${response.statusText}`);
-        return;
+        }
+        // 为 claude 特殊处理：
+        if (apiUrl.includes('api.anthropic.com')){
+            dict_headers['anthropic-dangerous-direct-browser-access'] = 'true';
+        }
+        //
+        response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: dict_headers,
+            body: JSON.stringify(requestBody), // 将请求体序列化为 JSON
+        });
+        // 检查 HTTP 响应状态
+        if (!response.ok || !response.body) {
+            const errorText = await response.text();
+            console.error('Error from LLM API:', errorText);
+            alert(`ERROR 156: ${response.status} ${response.statusText}`);
+            return;
+        }
     }
+    catch(err){  // 这里如果出错，最可能的是CORS限制。此时得到的response是空对象。
+        console.error('Error 167:',err);
+        alert(`ERROR 167: ${err} \n response = ${response}.`);
+        return;
+    }   
     // 解析流式响应
     const reader = response.body.getReader();
     const decoder = new TextDecoder('utf-8');
-    //
-    // 滚动条移动到光标位置
-    await scroll_to_view(platform);
     //
     // 逐块读取流式数据
     let output_str = '';
     let need_add_head = true;
     let fail_count = 0
-    const fail_count_max = 3
+    const FAIL_COUNT_MAX = 3
     //
     while (true) {
         const { done, value } = await reader.read();
         if (done) break; // 流结束时退出循环
-        if (fail_count >= fail_count_max) {
+        if (fail_count >= FAIL_COUNT_MAX) {
             alert('Sorry, something went wrong. Please check plugin logs for detail.')
             break;  // 连续失败后退出
         }
         // 解码并解析数据块
         const chunk:string = decoder.decode(value, { stream: true });
         console.info('Stream Chunk:', chunk);
-
         // 解析 JSON 行
         if (typeof chunk === "string"){
             for (const line of chunk.split('\n')) { //
@@ -180,16 +201,13 @@ export async function llmReplyStream({inp_str, lst_msg = [],
                 if (!trimmedLine || !trimmedLine.startsWith('data:')) {
                     continue;
                 }
-
                 // 处理 "data:" 前缀
                 const jsonString = trimmedLine.replace(/^data:/, ''); // 去掉 "data:" 前缀
-
                 // 特殊情况：处理流结束的标志 "data: [DONE]"
-                if (jsonString === '[DONE]') {
-                    console.info('Stream finished.');
+                if (jsonString.trim() === '[DONE]') {
+                    console.info('Got [DONE]. Stream finished.');
                     break;
                 }
-
                 try {
                     // 解析 JSON 数据
                     const parsed = JSON.parse(jsonString);
@@ -238,10 +256,15 @@ export async function llmReplyStream({inp_str, lst_msg = [],
         await insertContentToNote(`\n${chat_tail}\n\n`);
     }
     await scroll_to_view(platform);
+    //
+    // 完成
     // await joplin.views.dialogs.showToast({message:'Finished successfully.', duration:5000, type:'success'});
     await (joplin.views.dialogs as any).showToast({message:'Response finished.', duration:2500+(Date.now()%500), type:'success',timestamp: Date.now()});
 }
-
+/**
+ * 切换 LLM 模型选项
+ * @param llm_no 数字，代表了使用的模型序号
+ */
 export async function changeLLM(llm_no=0) {
     let int_target_llm=0;
     if (llm_no!=0){
@@ -252,6 +275,9 @@ export async function changeLLM(llm_no=0) {
         let int_current_llm = parseInt(String(current_llm['llmSelect']));
         if(int_current_llm==1){
             int_target_llm = 2
+        }
+        else if(int_current_llm==3){
+            int_target_llm = 3
         }
         else{
             int_target_llm = 1

@@ -34,6 +34,11 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat', 
         apiUrl = String(llmSettingValues['llmServerUrl2']) + '/chat/completions';
         apiKey = String(llmSettingValues['llmKey2']);
     } 
+    else if(llmSelect==2){
+        apiModel = String(llmSettingValues['llmModel2']);
+        apiUrl = String(llmSettingValues['llmServerUrl2']) + '/chat/completions';
+        apiKey = String(llmSettingValues['llmKey2']);
+    } 
     // 高级参数
     let apiTemperature = llmSettingValues['llmTemperature'];
     apiTemperature = parseFloat(String(apiTemperature));

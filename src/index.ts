@@ -63,6 +63,14 @@ joplin.plugins.register({
 				await changeLLM(2);
 			}
 		});
+		await joplin.commands.register({
+			name: 'quickChangeLLM3',
+			label: dictText['switch_to_LLM3'],
+			iconName: 'fas fa-robot',
+			execute: async () => {
+				await changeLLM(3);
+			}
+		});
 		//
 		// 摘要
 		await joplin.commands.register({
@@ -266,31 +274,43 @@ joplin.plugins.register({
 			label: dictText['chat_label'], //'Chat and reply (above cursor)',
 			iconName: 'fas fa-comments',
 			execute:async()=>{
-				try {
-					let dict_selection = await split_note_by_selection();
-					// 
+				try { 
 					// 判断是否在markdown模式
 					if (typeof(await joplin.commands.execute('editor.execCommand', { name: 'cm-getSelectionInfo' })) === 'boolean'){
 						alert('ERROR 124: Maybe you are not in markdown mode?');
 						return;
 					}
+					else{
+						console.log('In markdown mode. Continue.');
+					}
+					//
+					let dict_selection = await split_note_by_selection();
+					// console.warn(dict_selection);
 					if (dict_selection.is_selection_exists){
-						await llmReplyStream({inp_str:dict_selection.str_selected, 
+						await llmReplyStream({ 
+							inp_str:dict_selection.str_selected, 
 							query_type:'chat', 
-							is_selection_exists:false
+							is_selection_exists:true
 						});
                     }
 					else{
-						await llmReplyStream({inp_str:dict_selection.str_before, 
-							query_type:'chat', 
-							is_selection_exists:true
+						await llmReplyStream({
+							inp_str: dict_selection.str_before, 
+							query_type: 'chat', 
+							is_selection_exists:false
 						});
 					}
 					console.info('Streaming complete!');
 				}
 				catch(error){
-					console.error('Error 295:', error);
-					alert(`Error 295: ${error}`);
+					if (error.message.includes('Failed to fetch')){
+						console.error('Error 307:', error);
+						alert(`Error 307: ${error}. This caused by your network or LLM server CORS.`);
+					}
+					else{
+						console.error('Error 295:', error);
+						alert(`Error 295: ${error}`);
+					}
 				}
 			}
 		})
@@ -330,6 +350,10 @@ joplin.plugins.register({
 			  {
 				label: 'Switch_to_LLM_2',
 				commandName: 'quickChangeLLM2', // 绑定的命令
+			  },
+			  {
+				label: 'Switch_to_LLM_3',
+				commandName: 'quickChangeLLM3', // 绑定的命令
 			  },
 			],
 			MenuItemLocation.Tools // 菜单位置：添加到“工具”菜单

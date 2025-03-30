@@ -29,7 +29,7 @@ Others functions are under development.
 
 After installing this plugin, you should go to settings to configure your ai options. At least input one URL, API key, and model name.
 
-You can configure two LLMs and switch between them.
+You can configure up to 3 LLMs and switch among them.
 
 ![image-20250211191521564](./_img/image-20250211191521564.png)
 
@@ -42,11 +42,12 @@ And, in the top menu under Tools / NoteLLM, find quick access to all functions. 
 ![image-20250211190753843](./_img/image-20250211190753843.png)
 
 ## UPDATE LOGS
-
+- v0.4.7, 2025-03-30. Tried to fix CORS of Claude API.
+- v0.4.6, 2025-03-09. Number of LLMs extended to 3.
 - v0.4.5, 2025-03-09. Bug fixed.
-- v0.4.4, 2025-03-08. Add dialogs for ask and improve.
+- v0.4.4, 2025-03-08. Add dialogs for "LLM ask" and "LLM improve".
 - v0.4.3, 2025-03-07. Multi-language (Simplified Chinese) supported.
-- v0.4.2, 2025-03-06. LLMs can change by menu.
+- v0.4.2, 2025-03-06. LLMs can be changed via tool menu.
 - v0.4.0, 2025-02-25. Better support for mobile.
 
 ## Thank you

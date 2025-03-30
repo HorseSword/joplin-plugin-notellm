@@ -28,7 +28,8 @@ export async function registerSettings(): Promise<void> {
         isEnum:true,
         options: {
           1: 'LLM 1',
-          2: 'LLM 2'
+          2: 'LLM 2',
+          3: 'LLM 3'
         }
       },
       llmServerUrl: {
@@ -77,7 +78,7 @@ export async function registerSettings(): Promise<void> {
         description: dictText['url_llm2_desc'], //'The 2nd LLM server URL (optional).',
         section: 'notellm.settings',
         public: true,
-        advanced: false,
+        advanced: true,
       },
       llmModel2: {
         type: SettingItemType.String,
@@ -86,7 +87,7 @@ export async function registerSettings(): Promise<void> {
         description: dictText['model_llm2_desc'],//'The 2nd LLM Model Name (optional).',
         section: 'notellm.settings',
         public: true,
-        advanced: false,
+        advanced: true,
       },
       //
       llmKey2: {
@@ -96,7 +97,7 @@ export async function registerSettings(): Promise<void> {
         description: dictText['key_llm2_desc'], // 'API key for the 2nd LLM (optional)',
         section: 'notellm.settings',
         public: true,
-        advanced: false,
+        advanced: true,
         secure: true, // 密码输入框
       },
       llmExtra2: {
@@ -104,6 +105,46 @@ export async function registerSettings(): Promise<void> {
         value: '',
         label: dictText['extra_llm2_label'],  // 'Extra config for LLM 2 (Optional)',
         description: dictText['extra_llm2_desc'],  // 'The 2nd LLM Model extra config in json format, e.g. {"key1":"value1", "key2":"value2"}. This will cover current config by key.',
+        section: 'notellm.settings',
+        public: true,
+        advanced: true,
+      },
+      //
+      //
+      llmServerUrl3: {
+        type: SettingItemType.String,
+        value: 'https://api.deepseek.com/v1',
+        label: dictText['url_llm3_label'],
+        description: dictText['url_llm3_desc'], 
+        section: 'notellm.settings',
+        public: true,
+        advanced: true,
+      },
+      llmModel3: {
+        type: SettingItemType.String,
+        value: 'deepseek-chat',
+        label: dictText['model_llm3_label'],
+        description: dictText['model_llm3_desc'],
+        section: 'notellm.settings',
+        public: true,
+        advanced: true,
+      },
+      //
+      llmKey3: {
+        type: SettingItemType.String,
+        value: '',
+        label: dictText['key_llm3_label'], 
+        description: dictText['key_llm3_desc'],
+        section: 'notellm.settings',
+        public: true,
+        advanced: true,
+        secure: true, // 密码输入框
+      },
+      llmExtra3: {
+        type: SettingItemType.String,
+        value: '',
+        label: dictText['extra_llm3_label'], 
+        description: dictText['extra_llm3_desc'],  
         section: 'notellm.settings',
         public: true,
         advanced: true,
