@@ -1,6 +1,6 @@
 import joplin from 'api';
 import {ToolbarButtonLocation, ContentScriptType, MenuItemLocation } from 'api/types';
-import { registerSettings, pluginIconName } from './settings';
+import {registerSettings, pluginIconName } from './settings';
 import {llmReplyStream, changeLLM} from './my_utils';
 import {getTxt} from './texts';
 
@@ -90,7 +90,7 @@ joplin.plugins.register({
 					if (dict_selection.is_selection_exists){
 						let prompt_messages = []
 						prompt_messages.push({ role: 'system', content: dict_selection.str_selected});
-						prompt_messages.push({ role: 'user', content: '请简要概括上文的主要内容，并用列表的方式列举提炼出的要点。' });
+						prompt_messages.push({ role: 'user', content: dictText['prompt_summary'] });
 						//
 						await llmReplyStream({
 							inp_str:'nothing', 
@@ -102,7 +102,7 @@ joplin.plugins.register({
 					else{
 						let prompt_messages = []
 						prompt_messages.push({ role: 'system', content: dict_selection.str_before});
-						prompt_messages.push({ role: 'user', content: '请简要概括上文的主要内容，并用列表的方式列举提炼出的要点。' });
+						prompt_messages.push({ role: 'user', content: dictText['prompt_summary'] });
 						//
 						await llmReplyStream({
 							inp_str:'nothing', 
@@ -161,7 +161,7 @@ joplin.plugins.register({
 						}
 						//
 						let prompt_messages = []
-						prompt_messages.push({ role: 'system', content: '你的任务是帮助用户完善文档。'});
+						prompt_messages.push({ role: 'system', content: dictText['prompt_improve_1'] });
 						if (dict_selection.str_before.length>0){
 							prompt_messages.push({role:'user',content:`<text_before_selection>\n\n${dict_selection.str_before}\n\n</text_before_selection>`});
 						}
@@ -173,7 +173,7 @@ joplin.plugins.register({
 							prompt_messages.push({role:'user',content:`<text_after_selection>\n\n${dict_selection.str_after}\n\n</text_after_selection>`});
 						}
 						prompt_messages.push({ role: 'user', 
-							content: `请帮助用户完善文档。参考前后文及其关联关系，按'command'部分的要求，改进'text_selected'部分的文本表达。请直接回复最终结果，不需要额外的文字，严禁修改其余任何部分。不需要抄写 text_before_selection 或 text_after_selection。`
+							content: dictText['prompt_improve_2']
 						});
 						await llmReplyStream({inp_str:dict_selection.str_selected,
 							query_type:'improve',
@@ -230,7 +230,7 @@ joplin.plugins.register({
 						}
 						//
 						let prompt_messages = []
-						prompt_messages.push({ role: 'system', content: '接下来用户会针对选中的部分提问。'});
+						prompt_messages.push({ role: 'system', content: dictText['prompt_ask_1']});
 						if (dict_selection.str_before.length>0){
 							prompt_messages.push({role:'user',content:`<text_before_selection>\n\n${dict_selection.str_before}\n\n</text_before_selection>`});
 						}
@@ -243,7 +243,7 @@ joplin.plugins.register({
 							prompt_messages.push({role:'user',content:`<text_after_selection>\n\n${dict_selection.str_after}\n\n</text_after_selection>`});
 						}
 						prompt_messages.push({ role: 'user', 
-							content: `任务说明: 请参考前后文及其关联关系，针对 “text_selected” 部分提供的内容，回复用户在"user_command"所提出的问题。请直接回复最终结果，不需要抄写 text_before_selection 或 text_after_selection。`
+							content: dictText['prompt_ask_2']
 						});
 						await llmReplyStream({inp_str:dict_selection.str_selected,
 							query_type:'ask',

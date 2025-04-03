@@ -1,4 +1,5 @@
 import joplin from '../api';
+import {getTxt} from './texts';
 
 /**
  * 对话的消息体类
@@ -33,6 +34,9 @@ export async function scroll_to_view (mode:string='none') {
  */
 export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     is_selection_exists=true, str_before='', str_after=''}){
+    //
+    const locale = await joplin.settings.globalValue('locale');
+    let dictText = getTxt(locale);
     //
     console.log(inp_str);
     console.log(lst_msg);
@@ -117,7 +121,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     else{
         let prompt_head = 'You are a helpful assistant.';
         if(query_type === 'chat'){
-            prompt_head = '你是用户的助手。你的任务是以对话的方式，基于用户前文提供的信息，以对话的形式回复最后的段落。请注意，回复完成之后不要额外追问。';
+            prompt_head = dictText['prompt_chat'];
         }
         prompt_messages.push({ role: 'system', content: prompt_head});
         prompt_messages.push({ role: 'user', content: inp_str });
