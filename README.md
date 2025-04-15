@@ -45,6 +45,7 @@ And, in the top menu under Tools / NoteLLM, find quick access to all functions. 
 ![image-20250211190753843](./_img/image-20250211190753843.png)
 
 ## UPDATE LOGS
+- v0.4.9, 2025-04-15. Improved prompts for "chat" and "summary". Thanks to [Adam Outler](https://github.com/adamoutler). And, useless old files removed.
 - v0.4.8, 2025-04-03. Improved the prompts to fix a bug that caused responses to non-Chinese content to be in Chinese.
 - v0.4.7, 2025-03-30. Tried to fix CORS of Claude API.
 - v0.4.6, 2025-03-09. We can set up to 3 LLMs now.
