@@ -45,6 +45,7 @@ And, in the top menu under Tools / NoteLLM, find quick access to all functions. 
 ![image-20250211190753843](./_img/image-20250211190753843.png)
 
 ## UPDATE LOGS
+- v0.4.11, 2025-05-04. New promo_tile.
 - v0.4.10, 2025-05-04. New advanced chat mode. Optimize the parsing of previous text based on chat characteristics, including splitting dialogue roles, skipping the 'think' part of the reasoning model, and other functions.
 - v0.4.9, 2025-04-15. Improved prompts for "chat" and "summary". Thanks to [Adam Outler](https://github.com/adamoutler). And, useless old files removed.
 - v0.4.8, 2025-04-03. Improved the prompts to fix a bug that caused responses to non-Chinese content to be in Chinese.
