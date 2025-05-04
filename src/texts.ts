@@ -58,6 +58,8 @@ export function getTxt(lan='en') {
     dictText['temperature_desc']=isZH?'越低越稳定，越高越有创意，建议0到1之间。':'0 <= Temperature <1'
     dictText['max_tokens_label']=isZH?'最大输出 token 数量限制':'llm max tokens'
     dictText['max_tokens_desc']=isZH?'限制模型的输出长度，建议值：1024, 2048, 4096等。这个值过大可能导致模型报错。':'Num of max tokens. e.g. 1024, 2048, 4096. Too large may cause llm error.'
+    dictText['chat_type_label']=isZH?'聊天高级模式（测试版）':'Advanced Chat Mode (beta)'
+    dictText['chat_type_desc']=isZH?'针对聊天特性优化前文解析，包括拆分对话角色、跳过推理模型 think 部分等功能。':'Optimize the parsing of previous text for chat features, including splitting dialogue roles, skipping the think part of the reasoning model, and other functions.'
     //
     dictText['prompt_chat']=isZH?'你是用户的助手。你的任务是以对话的方式，基于用户前文提供的信息，以对话的形式回复最后的段落。请注意，回复完成之后不要额外追问。':`You are helpful assistant. You are operating in a wiki environment. Your task is to respond to the final paragraph in a conversational manner based on the information provided by the user previously. Please note that you should not ask additional follow-up questions after your response.`;
     dictText['prompt_summary']=isZH?`任务要求：请简要概括上文的主要内容，并用列表的方式提炼要点.`:'Your task: Briefly summarize the main content of the above text and list the key points. Use same language as given texts, unless explicitly requested otherwise.'

@@ -193,6 +193,20 @@ export async function registerSettings(): Promise<void> {
         label: 'llm max input length.',
         advanced: true,
       },
+      llmChatType: { 
+        type: SettingItemType.Int,
+        value: 2,
+        label: dictText['chat_type_label'], 
+        description: dictText['chat_type_desc'], 
+        section: 'notellm.settings',
+        public: true,
+        advanced: false,
+        isEnum:true,
+        options: {
+          1: 'ON',
+          2: 'OFF',
+        }
+      },
     });
 }
 

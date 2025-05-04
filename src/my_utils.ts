@@ -47,7 +47,8 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         'llmModel2','llmServerUrl2','llmKey2','llmExtra2',
         'llmModel3','llmServerUrl3','llmKey3','llmExtra3',
         'llmSelect',
-        'llmTemperature','llmMaxTokens','llmScrollType'
+        'llmTemperature','llmMaxTokens','llmScrollType',
+        'llmChatType'
     ]);
     // 基础参数
     let llmSelect = llmSettingValues['llmSelect'];
@@ -119,12 +120,22 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         prompt_messages = lst_msg;
     }
     else{
+        // 基础参数
+        let chatType = parseInt(String(llmSettingValues['llmChatType']));
+
         let prompt_head = 'You are a helpful assistant.';
-        if(query_type === 'chat'){
+        if(query_type === 'chat' && chatType == 1){
             prompt_head = dictText['prompt_chat'];
         }
         prompt_messages.push({ role: 'system', content: prompt_head});
-        prompt_messages.push({ role: 'user', content: inp_str });
+        if(query_type === 'chat'&& chatType == 1){
+            let lstSplited = splitText(inp_str);
+            prompt_messages = prompt_messages.concat(lstSplited);
+            console.log(prompt_messages);
+        }
+        else{
+            prompt_messages.push({ role: 'user', content: inp_str });
+        }
     }
     //
     // 构造请求体
@@ -202,7 +213,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         }
         // 解码并解析数据块
         const chunk:string = decoder.decode(value, { stream: true });
-        console.info('Stream Chunk:', chunk);
+        // console.info('Stream Chunk:', chunk);
         // 解析 JSON 行
         if (typeof chunk === "string"){
             for (const line of chunk.split('\n')) { //
@@ -271,6 +282,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     // await joplin.views.dialogs.showToast({message:'Finished successfully.', duration:5000, type:'success'});
     await (joplin.views.dialogs as any).showToast({message:'Response finished.', duration:2500+(Date.now()%500), type:'success',timestamp: Date.now()});
 }
+
 /**
  * 切换 LLM 模型选项
  * @param llm_no 数字，代表了使用的模型序号
@@ -302,4 +314,83 @@ export async function changeLLM(llm_no=0) {
         type:'success',
         timestamp: Date.now()
     }); 
+}
+
+/**
+ * For chat only. Split long text to dialog list, including role and content.
+ */
+export function splitText(raw:string, remove_think:boolean=true) {
+
+    const lines = raw.split(/\r?\n/);
+    // let remove_think = true;
+    let result = [];
+    let buffer = [];
+    let currentRole = "user";
+    let inResponse = false;
+    let responder = null;
+
+    // 辅助函数：将 buffer 合并入 result
+    function flushBuffer(role:string) {
+      if (buffer.length === 0) return;
+      const content = buffer.join('\n');
+      // 合并到 result，如果上一个的 role 相同
+      if (result.length > 0 && result[result.length - 1].role === role) {
+        result[result.length - 1].content += '\n' + content;
+      } else {
+        result.push({ role, content });
+      }
+      buffer = [];
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // 检查开始标记
+      const startMatch = line.match(/^\*\*Response from (.+):\*\*$/);
+      if (startMatch) {
+        // 先flush之前的内容
+        flushBuffer(currentRole);
+
+        // 启动新的包裹
+        inResponse = true;
+        responder = startMatch[1].trim();
+        // currentRole = responder;
+        currentRole = "assistant";
+        continue;
+      }
+
+      // 检查结束标记
+      if (line.trim() === '\*\*End of response\*\*') {
+        flushBuffer(currentRole);
+        inResponse = false;
+        responder = null;
+        currentRole = "user";
+        continue;
+      }
+
+      // 处理内容
+      buffer.push(line);
+    }
+
+    // 处理最后残留
+    flushBuffer(currentRole);
+
+    // 去除纯空内容
+    // const cleanResult = result.filter(item => item.content.trim() !== '');
+
+    // 移除 <think> </think> 部分
+    if(remove_think && result.length > 0){
+        for (let i = 0; i < result.length; i++) {
+            if (result[i].role === "assistant"){
+                let content = result[i].content;
+                let content_without_think = content.trim().replace(/^<think>[\s\S]*?<\/think>/, '').trimStart();
+                result[i].content = content_without_think;
+            } 
+            else{
+                result[i].content = result[i].content.trim();
+            }
+        }
+    }
+    //
+    return result;
 }
