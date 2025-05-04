@@ -25,7 +25,9 @@
 		}
 	],
 	"icons": {},
-	"promo_tile": {},
+	"promo_tile": {
+		"src": "_img/NoteLLM.png"
+	},
 	"platforms": [
 		"desktop",
 		"mobile"
