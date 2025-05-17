@@ -73,6 +73,20 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                 });
             }
             /**
+             * 修改范围内的内容
+             * 
+             */
+            function replaceRange(fromPos, toPos, newStr='') {
+                view.dispatch({
+                    changes:{
+                        from: fromPos,
+                        to: toPos,
+                        insert: newStr
+                    },
+                    // selection: { anchor: fromPos + newStr.length },
+                });
+            }
+            /**
              * 移动光标位置
              * 
              */
@@ -142,10 +156,14 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                 moveCursorPosition(position);
             });
             codeMirrorWrapper.registerCommand("cm-getCursorPos", () => {
-                getCursorPos();
+                let cursor_pos = getCursorPos();
+                return cursor_pos;
             });
             codeMirrorWrapper.registerCommand("cm-myInsertText", (inp_str) => {
                 myInsertText(inp_str);
+            });
+            codeMirrorWrapper.registerCommand("cm-replaceRange", (fromPos,toPos,newStr) => {
+                replaceRange(fromPos,toPos,newStr);
             });
         },
     };

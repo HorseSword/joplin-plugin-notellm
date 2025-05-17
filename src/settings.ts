@@ -207,6 +207,20 @@ export async function registerSettings(): Promise<void> {
           2: 'OFF',
         }
       },
+      llmChatSkipThink: { 
+        type: SettingItemType.Int,
+        value: 0,
+        label: dictText['chat_skip_think_label'], 
+        description: dictText['chat_skip_think_desc'], 
+        section: 'notellm.settings',
+        public: true,
+        advanced: false,
+        isEnum:true,
+        options: {
+          1: 'ON',
+          0: 'OFF',
+        }
+      },
     });
 }
 

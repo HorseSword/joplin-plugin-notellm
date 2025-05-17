@@ -1,3 +1,4 @@
+import { getCurves } from 'crypto';
 import joplin from '../api';
 import {getTxt} from './texts';
 
@@ -48,7 +49,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         'llmModel3','llmServerUrl3','llmKey3','llmExtra3',
         'llmSelect',
         'llmTemperature','llmMaxTokens','llmScrollType',
-        'llmChatType'
+        'llmChatType','llmChatSkipThink'
     ]);
     // 基础参数
     let llmSelect = llmSettingValues['llmSelect'];
@@ -122,8 +123,9 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     else{
         // 基础参数
         let chatType = parseInt(String(llmSettingValues['llmChatType']));
-
         let prompt_head = 'You are a helpful assistant.';
+        //
+        // Chat message list
         if(query_type === 'chat' && chatType == 1){
             prompt_head = dictText['prompt_chat'];
         }
@@ -204,11 +206,97 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     let fail_count = 0
     const FAIL_COUNT_MAX = 3
     //
+    // think part
+    let skip_thinking = false;
+    if(parseInt(String(llmSettingValues['llmChatSkipThink'])) ==1){
+        skip_thinking = true;
+    }
+    let thinking_status = 'not_started';
+    let think_interval = null;
+    let think_progress_str = '';
+    let tmp_cur_pos = await joplin.commands.execute('editor.execCommand', {
+                            name: 'cm-getCursorPos' 
+                        });
+    let think_start_pos = tmp_cur_pos.startLine.from+tmp_cur_pos.startPosition.column;
+    let think_end_pos = think_start_pos;
+    let think_index = 0;
+    //
+    // 开启计时器
+    async function startProgress() {
+        if (think_interval) return;
+        tmp_cur_pos = await joplin.commands.execute('editor.execCommand', {
+                            name: 'cm-getCursorPos' 
+                        });
+        if (skip_thinking){
+            think_start_pos = tmp_cur_pos.startLine.from+tmp_cur_pos.startPosition.column;
+            think_end_pos = think_start_pos;
+            think_progress_str = '';
+            //
+            think_interval = setInterval(async() => {
+                // if (think_progress_str === 'Thinking') think_progress_str = 'Thinking.';
+                // else if (think_progress_str === 'Thinking.') think_progress_str = 'Thinking..';
+                // else if (think_progress_str === 'Thinking..'){
+                //     think_progress_str = 'Thinking...';
+                // }
+                // else think_progress_str = 'Thinking';
+                //
+                const thinkStates = ['(Thinking...)', '(.Thinking..)', '(..Thinking.)', '(...Thinking)', '(..Thinking.)',  '(.Thinking..)'];
+                if (think_index > thinkStates.length || think_index < 0) think_index = 0; // 如果不在数组中，从第一个状态开始
+                else think_index = (think_index + 1) % thinkStates.length;
+                think_progress_str = thinkStates[think_index];
+                //
+                // console.log(think_start_pos, think_end_pos, think_progress_str);
+                // 更新提示符
+                await joplin.commands.execute('editor.execCommand', {
+                    name: 'cm-replaceRange',
+                    args: [think_start_pos, think_end_pos, think_progress_str]
+                });
+                think_end_pos = think_start_pos + think_progress_str.length;
+            }, 200);
+        }
+    }
+    // 关闭计时器
+    async function stopProgress() {
+      if (think_interval) {
+        clearInterval(think_interval);
+        think_interval = null;
+        //
+        think_end_pos = think_start_pos + think_progress_str.length;
+        think_progress_str = '';
+        await joplin.commands.execute('editor.execCommand', {
+                             name: 'cm-replaceRange',
+                             args: [think_start_pos,think_end_pos,'']
+        });
+      }
+    }
+    //
+    // 开始思考
+    async function think_start(){
+        // await (joplin.views.dialogs as any).showToast({
+        //     message:'Thinking...', 
+        //     duration:2500+(Date.now()%500), 
+        //     type:'success',
+        //     timestamp: Date.now()
+        // });
+        await startProgress();
+    }
+    //
+    // 思考中
+    async function think_going(){
+    }
+    //
+    // 结束思考
+    async function think_end(){
+        //
+        await stopProgress();
+    }
+    let cur_pos;
     while (true) {
         const { done, value } = await reader.read();
         if (done) break; // 流结束时退出循环
         if (fail_count >= FAIL_COUNT_MAX) {
             alert('Sorry, something went wrong. Please check plugin logs for detail.')
+            await stopProgress();
             break;  // 连续失败后退出
         }
         // 解码并解析数据块
@@ -216,6 +304,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         // console.info('Stream Chunk:', chunk);
         // 解析 JSON 行
         if (typeof chunk === "string"){
+
             for (const line of chunk.split('\n')) { //
                 const trimmedLine = line.trim();
                 // 忽略空行或无效行
@@ -232,8 +321,59 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
                 try {
                     // 解析 JSON 数据
                     const parsed = JSON.parse(jsonString);
-                    const content = parsed.choices[0]?.delta?.content || '';
-                    output_str+=content;
+                    let new_content = parsed.choices[0]?.delta?.content || '';
+                    //
+                    if (thinking_status === 'not_started'){
+                        // only when startswith <think>
+                        if (new_content.trim() === '<think>'){
+                            thinking_status = 'thinking'
+                            // 
+                            // 思考期间的等待可视化
+                            if (skip_thinking){
+                                await think_start();
+                                continue;
+                            }
+                        }
+                        else{
+                            thinking_status = 'think_finished';
+                        }
+                    }
+                    else if(thinking_status === 'thinking'){
+                        if (new_content.trim() === '</think>'){
+                            thinking_status = 'think_ends';
+                            await think_end();
+                        }
+                        if (skip_thinking){
+                            continue;
+                        }
+                    } 
+                    else if (thinking_status === 'think_ends'){
+                        if(new_content.trim() === ''){
+                            if (skip_thinking){
+                                continue;
+                            }
+                        }
+                        else if (new_content.trim().length > 0){
+                            thinking_status = 'think_finished'
+                            if (skip_thinking){
+                                new_content = new_content.trim();
+                            }
+                        }
+                    }
+                    //
+                    output_str += new_content;
+                    // 还原光标位置 TODO
+                    try{
+                        let last_pos = cur_pos.startLine.from+cur_pos.startPosition.column;
+                        await joplin.commands.execute('editor.execCommand', {
+                            name: 'cm-moveCursorPosition',
+                            args: [last_pos]
+                        });
+                    }
+                    catch{
+                        //
+                    }
+                    //
                     if(need_add_head){
                         if (output_str.length>10 && !output_str.trim().startsWith('**')){  // 肯定不是重复出现
                             await insertContentToNote(output_str);
@@ -252,10 +392,21 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
                         fail_count = 0;
                     }
                     else{
-                        await insertContentToNote(content); // 实时更新内容
+                        await insertContentToNote(new_content); // 实时更新内容
                     }
                     // 滚动条移动到光标位置
                     await scroll_to_view(platform);
+                    //
+                    // 存储光标位置
+                    try{
+                        cur_pos = await joplin.commands.execute('editor.execCommand', {
+                            name: 'cm-getCursorPos' 
+                        });
+                        // console.log('cur_pos = ',cur_pos);
+                    }
+                    catch(err){
+                        console.warn('cm-getCursorPos:', err);
+                    }
                 } catch (err) {
                     console.warn('Failed to parse line:', trimmedLine, err);
                     // alert(`Failed to parse line: ${err}`);
@@ -279,8 +430,12 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     await scroll_to_view(platform);
     //
     // 完成
-    // await joplin.views.dialogs.showToast({message:'Finished successfully.', duration:5000, type:'success'});
-    await (joplin.views.dialogs as any).showToast({message:'Response finished.', duration:2500+(Date.now()%500), type:'success',timestamp: Date.now()});
+    await (joplin.views.dialogs as any).showToast({
+        message:'Finished.', 
+        duration:2500+(Date.now()%500), 
+        type:'success',
+        timestamp: Date.now()
+    });
 }
 
 /**

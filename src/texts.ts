@@ -60,6 +60,8 @@ export function getTxt(lan='en') {
     dictText['max_tokens_desc']=isZH?'限制模型的输出长度，建议值：1024, 2048, 4096等。这个值过大可能导致模型报错。':'Num of max tokens. e.g. 1024, 2048, 4096. Too large may cause llm error.'
     dictText['chat_type_label']=isZH?'聊天高级模式（测试版）':'Advanced Chat Mode (beta)'
     dictText['chat_type_desc']=isZH?'针对聊天特性优化前文解析，包括拆分对话角色、跳过推理模型 think 部分等功能。':'Optimize the parsing of previous text for chat features, including splitting dialogue roles, skipping the think part of the reasoning model, and other functions.'
+    dictText['chat_skip_think_label']=isZH?'隐藏推理模型的 think 文本':'Hide "think" texts of Reasoning models'
+    dictText['chat_skip_think_desc']=isZH?'不显示推理模型think部分的文本。ON：推理执行但不显示(非推理模型不受影响)。OFF：显示完整推理内容。':'ON: Hide texts between <think> and </think>; non-reasoning models are unaffected. OFF: Display full thinking content as in the original text.'
     //
     dictText['prompt_chat']=isZH?'你是用户的助手。你的任务是以对话的方式，基于用户前文提供的信息，以对话的形式回复最后的段落。请注意，回复完成之后不要额外追问。':`You are helpful assistant. You are operating in a wiki environment. Your task is to respond to the final paragraph in a conversational manner based on the information provided by the user previously. Please note that you should not ask additional follow-up questions after your response.`;
     dictText['prompt_summary']=isZH?`任务要求：请简要概括上文的主要内容，并用列表的方式提炼要点.`:'Your task: Briefly summarize the main content of the above text and list the key points. Use same language as given texts, unless explicitly requested otherwise.'
