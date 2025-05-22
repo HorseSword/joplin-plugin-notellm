@@ -34,6 +34,24 @@ After installing this plugin, you should go to settings to configure your ai opt
 
 You can configure up to 3 LLMs and switch among them.
 
+### Some examples for settings
+
+Currently, this plugin support OpenAI-API (including OpenAI compatibility APIs). 
+
+| Examples | LLM server url | LLM model name (examples) |
+| :----------------------------------------- | :--------------------------------------- | ------------------------------------------ |
+| OpenAI | `https://api.openai.com/v1` | `o3` |
+| Claude | `https://api.anthropic.com/v1` | `claude-3-7-sonnet-20250219` |
+| Deepseek | `https://api.deepseek.com/v1` | `deepseek-chat`,  or `deepseek-reasoner` |
+| Qwen | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.0-flash` |
+| volcengine | `https://ark.cn-beijing.volces.com/api/v3` | `doubao-1.5-pro-32k` |
+| ollama (local) | `http://your_id:your_port/v1` | `(YOUR_MODEL_NAME)` |
+
+**Reminder**: I tested qwen, deepseek, volcengine and ollama. If you find error(s), please tell me. Thank you.
+
+
+
 ![image-20250211191521564](./_img/image-20250211191521564.png)
 
 Then you will have access to several features. First, a chat icon appears at the top of the markdown editing interface. Clicking on it triggers a conversation with AI based on all preceding content up to your cursor position.
