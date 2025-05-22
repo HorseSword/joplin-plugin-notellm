@@ -36,7 +36,7 @@ You can configure up to 3 LLMs and switch among them.
 
 ### Some examples for settings
 
-Currently, this plugin support OpenAI-API (including OpenAI compatibility APIs). 
+Currently, this plugin support OpenAI-API (including OpenAI compatibility APIs). Thanks to [Ian Channing](https://github.com/ianchanning).
 
 | Examples | LLM server url | LLM model name (examples) |
 | :----------------------------------------- | :--------------------------------------- | ------------------------------------------ |
@@ -44,7 +44,7 @@ Currently, this plugin support OpenAI-API (including OpenAI compatibility APIs).
 | Claude | `https://api.anthropic.com/v1` | `claude-3-7-sonnet-20250219` |
 | Deepseek | `https://api.deepseek.com/v1` | `deepseek-chat`,  or `deepseek-reasoner` |
 | Qwen | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` |
-| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.0-flash` |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta` | `gemini-2.0-flash` |
 | volcengine | `https://ark.cn-beijing.volces.com/api/v3` | `doubao-1.5-pro-32k` |
 | ollama (local) | `http://your_id:your_port/v1` | `(YOUR_MODEL_NAME)` |
 
