@@ -1,16 +1,27 @@
 # Joplin Plugin: NoteLLM
 
-To be your very own AI-powered note plugin for Joplin. It's completely open-source and does not collect any logs or personal information.
+Your very own AI-powered note plugin for Joplin. 
+It's completely open-source and does not collect any logs or personal information.
 
 ![notellm](./_img/notellm.gif)
 
-## Features
+# Features
 
-- **Customizable LLM Service Source**: Configure the source of your Large Language Model (LLM) service, including options like `openai`, `deepseek`, `qwen`, or even a local LLM server that is compatible with `openai-api`, for example ollama. Configuration requires specifying a URL, API key, and model name.
-- **Summarization**: Summarize selected text portions efficiently. If nothing selected, LLM will summarize **all above cursor**.
-- **Improve your selection**: Improve the expression of selected text, with considering context before and after selection. You can tell LLM how to improve it.
-- **Question & Answer**: Ask LLM about selected texts. 
-- **Chat**: Chat with LLM on texts **all above cursor**. Texts after cursor will not be sent to LLM.
+- **Customizable LLM Service Source**: 
+    - Configure the source of your Large Language Model (LLM) service, including options like `openai`, `deepseek`, `qwen`, or even a local LLM server that is compatible with `openai-api`, for example ollama. Configuration requires specifying a URL, API key, and model name.
+    - You can find examples in 'Usage Instructions' part below.
+- **Chat**: 
+    - **If no selection**: Chat with LLM on texts **all above cursor**. All texts after cursor will **not** be sent to LLM.
+    - **If any texts are selected**: only selected texts will be sent.
+    - New feature: "Advanced Chat Mode". Split texts into pieces like {"role":"user","content":"xxx"}.
+- **Summarization**: 
+    - **If no selection**: Summarize **all above cursor**.
+    - **If any texts are selected**: Summarize selected text portions efficiently. 
+- **Improve your selection**: 
+    - Improve the expression of selected text. This will consider context before and after selection. 
+    - You can tell LLM how to improve it.
+- **Question & Answer**: 
+    - Ask LLM about selected texts.
 
 ## Mobile Support
 
@@ -22,7 +33,7 @@ Others functions are under development.
 - On mobile app, some LLM servers may not function properly due to CORS restrictions. It is known that ollama has this issue; you can try configuring a proxy to resolve it. This is restricted by framework and I can not fix it now.
 - Sometimes, when you click on a plugin icon, there is no response. Killing the app's background process and restarting the app usually resolves this issue. The cause may be related to Joplin's background management, though I am unable to pinpoint the exact problem at this time.
 
-## Usage Instructions
+# Usage Instructions
 
 **This plugin can only work in markdown editor!!!!**
 
@@ -34,7 +45,7 @@ After installing this plugin, you should go to settings to configure your ai opt
 
 You can configure up to 3 LLMs and switch among them.
 
-### Some examples for settings
+## Some examples for settings
 
 Currently, this plugin support OpenAI-API (including OpenAI compatibility APIs). Thanks to [Ian Channing](https://github.com/ianchanning).
 
@@ -62,7 +73,10 @@ And, in the top menu under Tools / NoteLLM, find quick access to all functions. 
 
 ![image-20250211190753843](./_img/image-20250211190753843.png)
 
-## UPDATE LOGS
+
+# Update Logs
+
+- v0.4.13, 2025-05-25. (1) New animation for the waiting period. (2) Bug fixed: Stop running if note changed unexpectedly.
 - v0.4.12, 2025-05-17. (1) We can hide contexts between `<think>` and `</think>` now. (2) Maintaining the cursor's position during generation, in order to avoid text input position errors caused by cursor movement.
 - v0.4.11, 2025-05-04. New promo_tile.
 - v0.4.10, 2025-05-04. New advanced chat mode. Optimize the parsing of previous text based on chat characteristics, including splitting dialogue roles, skipping the 'think' part of the reasoning model, and other functions.
@@ -76,6 +90,6 @@ And, in the top menu under Tools / NoteLLM, find quick access to all functions. 
 - v0.4.2, 2025-03-06. LLMs can be switched via tool menu.
 - v0.4.0, 2025-02-25. Better support for mobile app.
 
-## Thank you
+# Thank you!
 
 NoteLLM is designed to enhance your note-taking experience with powerful AI capabilities while ensuring privacy and customization.
