@@ -188,17 +188,19 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
             }, animation_interval);
         }
     }
-    async function stopWaitingProgress() {
+    async function stopWaitingProgress(is_current_note=true) {
         if (wait_interval) {
             clearInterval(wait_interval);
             wait_interval = null;
             //
             wait_end_pos = wait_start_pos + wait_progress_str.length;
             wait_progress_str = '';
-            await joplin.commands.execute('editor.execCommand', {
-                                name: 'cm-replaceRange',
-                                args: [wait_start_pos,wait_end_pos,'']
-            });
+            if(is_current_note){
+                await joplin.commands.execute('editor.execCommand', {
+                                    name: 'cm-replaceRange',
+                                    args: [wait_start_pos,wait_end_pos,'']
+                });
+            }
         }
     }
     try{
@@ -298,7 +300,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     let think_end_pos = think_start_pos;
     let think_index = 0;
     //
-    // 开启计时器
+    // 开启 think 计时器
     async function startThinkingProgress() {
         if (think_interval) return;
         tmp_cur_pos_think = await joplin.commands.execute('editor.execCommand', {
@@ -326,18 +328,20 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         }
     }
     //
-    // 关闭计时器
-    async function stopThinkingProgress() {
+    // 关闭 think 计时器
+    async function stopThinkingProgress(is_current_note=true) {
         if (think_interval) {
             clearInterval(think_interval);
             think_interval = null;
             //
             think_end_pos = think_start_pos + think_progress_str.length;
             think_progress_str = '';
-            await joplin.commands.execute('editor.execCommand', {
-                                name: 'cm-replaceRange',
-                                args: [think_start_pos,think_end_pos,'']
-            });
+            if(is_current_note){
+                await joplin.commands.execute('editor.execCommand', {
+                                    name: 'cm-replaceRange',
+                                    args: [think_start_pos,think_end_pos,'']
+                });
+            }
         }
     }
     //
@@ -355,181 +359,194 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         //
         await stopThinkingProgress();
     }
-    let cur_pos;
-    //
-    let current_note = await joplin.workspace.selectedNote();
-    while (true) {
-        let tmp_current_note = await joplin.workspace.selectedNote();
-        if (tmp_current_note.id != current_note.id){
-            alert('ERROR: Note changed unexpectedly.')
-            await stopWaitingProgress();
-            await stopThinkingProgress();
-            return;  // 连续失败后退出
-        }
-        const { done, value } = await reader.read();
-        if (done) break; // 流结束时退出循环
-        if (fail_count >= FAIL_COUNT_MAX) {
-            alert('Sorry, something went wrong. Please check plugin logs for detail.')
-            await stopWaitingProgress();
-            await stopThinkingProgress();
-            break;  // 连续失败后退出
-        }
-        // 解码并解析数据块
-        const chunk:string = decoder.decode(value, { stream: true });
-        // console.info('Stream Chunk:', chunk);
-        // 解析 JSON 行
-        if (typeof chunk === "string"){
-            for (const line of chunk.split('\n')) { //
-                const trimmedLine = line.trim();
-                // 忽略空行或无效行
-                if (!trimmedLine || !trimmedLine.startsWith('data:')) {
-                    continue;
-                }
-                // 处理 "data:" 前缀
-                const jsonString = trimmedLine.replace(/^data:/, ''); // 去掉 "data:" 前缀
-                // 特殊情况：处理流结束的标志 "data: [DONE]"
-                if (jsonString.trim() === '[DONE]') {
-                    console.info('Got [DONE]. Stream finished.');
-                    break;
-                }
-                try {
-                    // 解析 JSON 数据
-                    const parsed = JSON.parse(jsonString);
-                    let new_content = parsed.choices[0]?.delta?.content || '';
-                    //
-                    if (wait_interval && new_content.trim().length >0){
-                        // 先停止waiting提示
-                        await stopWaitingProgress();
+    try{
+        let cur_pos;
+        //
+        let current_note = await joplin.workspace.selectedNote();
+        while (true) {
+            let tmp_current_note = await joplin.workspace.selectedNote();
+            if (tmp_current_note.id != current_note.id){
+                alert('ERROR: Note changed unexpectedly.')
+                await stopWaitingProgress(false);
+                await stopThinkingProgress(false);
+                return;  // 连续失败后退出
+            }
+            const { done, value } = await reader.read();
+            if (done) break; // 流结束时退出循环
+            if (fail_count >= FAIL_COUNT_MAX) {
+                alert('Sorry, something went wrong. Please check plugin logs for detail.')
+                await stopWaitingProgress();
+                await stopThinkingProgress();
+                break;  // 连续失败后退出
+            }
+            // 解码并解析数据块
+            const chunk:string = decoder.decode(value, { stream: true });
+            // console.info('Stream Chunk:', chunk);
+            // 解析 JSON 行
+            if (typeof chunk === "string"){
+                for (const line of chunk.split('\n')) { //
+                    const trimmedLine = line.trim();
+                    // 忽略空行或无效行
+                    if (!trimmedLine || !trimmedLine.startsWith('data:')) {
+                        continue;
                     }
-                    //
-                    if (thinking_status === 'not_started'){
+                    // 处理 "data:" 前缀
+                    const jsonString = trimmedLine.replace(/^data:/, ''); // 去掉 "data:" 前缀
+                    // 特殊情况：处理流结束的标志 "data: [DONE]"
+                    if (jsonString.trim() === '[DONE]') {
+                        console.info('Got [DONE]. Stream finished.');
+                        break;
+                    }
+                    try {
+                        // 解析 JSON 数据
+                        const parsed = JSON.parse(jsonString);
+                        let new_content = parsed.choices[0]?.delta?.content || '';
                         //
-                        // only when startswith <think>
-                        if (new_content.trim() === '<think>'){
-                            thinking_status = 'thinking'
-                            // 
-                            // 思考期间的等待可视化
-                            if (hide_thinking){
-                                await think_start();
-                                continue;
-                            }
+                        if (wait_interval && new_content.trim().length >0){
+                            // 先停止waiting提示
+                            await stopWaitingProgress();
                         }
-                        else{
-                            thinking_status = 'think_finished';
-                        }
-                    }
-                    else if(thinking_status === 'thinking'){
-                        if (new_content.trim() === '</think>'){
-                            thinking_status = 'think_ends';
-                            await think_end();
-                        }
-                        if (hide_thinking){
-                            continue;
-                        }
-                    } 
-                    else if (thinking_status === 'think_ends'){
-                        if(new_content.trim() === ''){
-                            if (hide_thinking){
-                                continue;
-                            }
-                        }
-                        else if (new_content.trim().length > 0){
-                            thinking_status = 'think_finished'
-                            if (hide_thinking){
-                                new_content = new_content.trim();
-                            }
-                        }
-                    }
-                    //
-                    output_str += new_content;
-                    // 还原光标位置 TODO
-                    try{
-                        let last_pos = cur_pos.startLine.from + cur_pos.startPosition.column;
-                        await joplin.commands.execute('editor.execCommand', {
-                            name: 'cm-moveCursorPosition',
-                            args: [last_pos]
-                        });
-                    }
-                    catch{
                         //
-                    }
-                    //
-                    if(need_add_head){
-                        if (output_str.length>10 && !output_str.trim().startsWith('**')){  // 肯定不是重复出现
-                            await insertContentToNote(output_str);
-                            need_add_head = false;
-                        }
-                        else if(output_str.length>(5 + `**${chat_head}**`.length) ){
-                            if(output_str.trim().startsWith(`**${chat_head}**`)){  // 
-                                output_str = output_str.replace(`**${chat_head}**`,''); // 避免重复出现
-                                await insertContentToNote(output_str);
+                        if (thinking_status === 'not_started'){
+                            //
+                            // only when startswith <think>
+                            if (new_content.trim() === '<think>'){
+                                thinking_status = 'thinking'
+                                // 
+                                // 思考期间的等待可视化
+                                if (hide_thinking){
+                                    await think_start();
+                                    continue;
+                                }
                             }
                             else{
-                                await insertContentToNote(output_str);
+                                thinking_status = 'think_finished';
                             }
-                            need_add_head = false;
                         }
-                        fail_count = 0;
+                        else if(thinking_status === 'thinking'){
+                            if (new_content.trim() === '</think>'){
+                                thinking_status = 'think_ends';
+                                await think_end();
+                            }
+                            if (hide_thinking){
+                                continue;
+                            }
+                        } 
+                        else if (thinking_status === 'think_ends'){
+                            if(new_content.trim() === ''){
+                                if (hide_thinking){
+                                    continue;
+                                }
+                            }
+                            else if (new_content.trim().length > 0){
+                                thinking_status = 'think_finished'
+                                if (hide_thinking){
+                                    new_content = new_content.trim();
+                                }
+                            }
+                        }
+                        //
+                        output_str += new_content;
+                        // 还原光标位置 TODO
+                        try{
+                            let last_pos = cur_pos.startLine.from + cur_pos.startPosition.column;
+                            await joplin.commands.execute('editor.execCommand', {
+                                name: 'cm-moveCursorPosition',
+                                args: [last_pos]
+                            });
+                        }
+                        catch{
+                            //
+                        }
+                        //
+                        if(need_add_head){
+                            if (output_str.length>10 && !output_str.trim().startsWith('**')){  // 肯定不是重复出现
+                                await insertContentToNote(output_str);
+                                need_add_head = false;
+                            }
+                            else if(output_str.length>(5 + `**${chat_head}**`.length) ){
+                                if(output_str.trim().startsWith(`**${chat_head}**`)){  // 
+                                    output_str = output_str.replace(`**${chat_head}**`,''); // 避免重复出现
+                                    await insertContentToNote(output_str);
+                                }
+                                else{
+                                    await insertContentToNote(output_str);
+                                }
+                                need_add_head = false;
+                            }
+                            fail_count = 0;
+                        }
+                        else{
+                            await insertContentToNote(new_content); // 实时更新内容
+                        }
+                        // 滚动条移动到光标位置
+                        await scroll_to_view(platform);
+                        //
+                        // 存储光标位置
+                        try{
+                            cur_pos = await joplin.commands.execute('editor.execCommand', {
+                                name: 'cm-getCursorPos' 
+                            });
+                            // console.log('cur_pos = ',cur_pos);
+                        }
+                        catch(err){
+                            console.warn('cm-getCursorPos:', err);
+                        }
+                    } catch (err) {
+                        console.warn('Failed to parse line:', trimmedLine, err);
+                        // alert(`Failed to parse line: ${err}`);
+                        fail_count += 1;
                     }
-                    else{
-                        await insertContentToNote(new_content); // 实时更新内容
-                    }
-                    // 滚动条移动到光标位置
-                    await scroll_to_view(platform);
-                    //
-                    // 存储光标位置
-                    try{
-                        cur_pos = await joplin.commands.execute('editor.execCommand', {
-                            name: 'cm-getCursorPos' 
-                        });
-                        // console.log('cur_pos = ',cur_pos);
-                    }
-                    catch(err){
-                        console.warn('cm-getCursorPos:', err);
-                    }
-                } catch (err) {
-                    console.warn('Failed to parse line:', trimmedLine, err);
-                    // alert(`Failed to parse line: ${err}`);
-                    fail_count += 1;
                 }
             }
+            else{
+                console.info('Chunk is not string: ', chunk);
+            }
         }
-        else{
-            console.info('Chunk is not string: ', chunk);
-        }
-    }
-    try{
-        if (need_add_head){ // 万一总长度不足导致上面没有执行；
-            await insertContentToNote(output_str);
-        }
-        if (output_str.trim().endsWith(chat_tail)){
-            await insertContentToNote('\n\n');
-        }
-        else{
-            await insertContentToNote(`\n${chat_tail}\n\n`);
-        }
-        await scroll_to_view(platform);
         //
+        // 收尾工作
+        try{
+            if (need_add_head){ // 万一总长度不足导致上面没有执行；
+                await insertContentToNote(output_str);
+            }
+            if (output_str.trim().endsWith(chat_tail)){
+                await insertContentToNote('\n\n');
+            }
+            else{
+                await insertContentToNote(`\n${chat_tail}\n\n`);
+            }
+            await scroll_to_view(platform);
+            //
 
-        //
-        // 完成
-        await (joplin.views.dialogs as any).showToast({
-            message:'Finished.', 
-            duration:2500+(Date.now()%500), 
-            type:'success',
-            timestamp: Date.now()
-        });
+            //
+            // 完成
+            await (joplin.views.dialogs as any).showToast({
+                message:'Finished.', 
+                duration:2500+(Date.now()%500), 
+                type:'success',
+                timestamp: Date.now()
+            });
+        }
+        catch(err){
+            console.error('ERR501_in_utils.ts: ',err);
+        }
     }
     catch(err){
-        console.error('ERR501',err);
+        console.error('ERR531_in_utils.ts: ',err);
     }
     finally{
         try{
             await stopWaitingProgress();
-            await stopThinkingProgress();
         }
         catch(err){
             //
+        }
+        //
+        try{
+            await stopThinkingProgress();
+        }
+        catch{
+
         }
     }
 }
