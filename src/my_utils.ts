@@ -302,6 +302,9 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     //
     // 开启 think 计时器
     async function startThinkingProgress() {
+        //
+        await stopWaitingProgress();
+        //
         if (think_interval) return;
         tmp_cur_pos_think = await joplin.commands.execute('editor.execCommand', {
                             name: 'cm-getCursorPos' 
@@ -364,27 +367,36 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         //
         let current_note = await joplin.workspace.selectedNote();
         while (true) {
+            //
+            // 切换笔记后退出
             let tmp_current_note = await joplin.workspace.selectedNote();
             if (tmp_current_note.id != current_note.id){
                 alert('ERROR: Note changed unexpectedly.')
                 await stopWaitingProgress(false);
                 await stopThinkingProgress(false);
-                return;  // 连续失败后退出
+                return;  
             }
-            const { done, value } = await reader.read();
-            if (done) break; // 流结束时退出循环
+            // 连续失败后退出
             if (fail_count >= FAIL_COUNT_MAX) {
                 alert('Sorry, something went wrong. Please check plugin logs for detail.')
                 await stopWaitingProgress();
                 await stopThinkingProgress();
-                break;  // 连续失败后退出
+                break;  
             }
+            //
+            const { done, value } = await reader.read();
+            if (done) {
+                await stopWaitingProgress();
+                await stopThinkingProgress();
+                break; // 流结束时退出循环
+            }
+            //
             // 解码并解析数据块
             const chunk:string = decoder.decode(value, { stream: true });
             // console.info('Stream Chunk:', chunk);
             // 解析 JSON 行
-            if (typeof chunk === "string"){
-                for (const line of chunk.split('\n')) { //
+            if (typeof chunk === "string"){  // 块作为整理，可能有多行
+                for (const line of chunk.split('\n')) { // 逐行拆解
                     const trimmedLine = line.trim();
                     // 忽略空行或无效行
                     if (!trimmedLine || !trimmedLine.startsWith('data:')) {
@@ -402,15 +414,23 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
                         const parsed = JSON.parse(jsonString);
                         let new_content = parsed.choices[0]?.delta?.content || '';
                         //
-                        if (wait_interval && new_content.trim().length >0){
-                            // 先停止waiting提示
-                            await stopWaitingProgress();
+                        if (new_content.trim().length >0){
+                            if(wait_interval){
+                                // 先停止waiting提示
+                                await stopWaitingProgress();
+                            }
                         }
                         //
                         if (thinking_status === 'not_started'){
                             //
                             // only when startswith <think>
                             if (new_content.trim() === '<think>'){
+                                //
+                                if(wait_interval){
+                                   // 先停止waiting提示
+                                    await stopWaitingProgress();
+                                }
+                                //
                                 thinking_status = 'thinking'
                                 // 
                                 // 思考期间的等待可视化
