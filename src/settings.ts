@@ -221,6 +221,33 @@ export async function registerSettings(): Promise<void> {
           0: 'OFF',
         }
       },
+      //
+      // animation for waiting
+      llmWaitAnimation: { 
+        type: SettingItemType.Int,
+        value: 0,
+        label: dictText['wait_animation_label'], 
+        description: dictText['wait_animation_desc'], 
+        section: 'notellm.settings',
+        public: true,
+        advanced: false,
+        isEnum: true,
+        options: {
+          1: 'ON',
+          0: 'OFF',
+        }
+      },
+      //
+      // your prompt for chatting
+      llmChatPrompt:{
+        type: SettingItemType.String,
+        value: '',
+        label: dictText['chat_prompt_label'],  // 'llm max tokens.',
+        description: dictText['chat_prompt_desc'],
+        section: 'notellm.settings',
+        public: true,
+        advanced: true,
+      }
     });
 }
 

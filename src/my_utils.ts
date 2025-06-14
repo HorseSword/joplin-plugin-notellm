@@ -49,7 +49,8 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         'llmModel3','llmServerUrl3','llmKey3','llmExtra3',
         'llmSelect',
         'llmTemperature','llmMaxTokens','llmScrollType',
-        'llmChatType','llmChatSkipThink'
+        'llmChatType','llmChatSkipThink', 'llmWaitAnimation',
+        'llmChatPrompt'
     ]);
     // 基础参数
     let llmSelect = llmSettingValues['llmSelect'];
@@ -92,6 +93,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     else if (llmScrollType==2){platform = 'mobile'}
     else{platform = 'none'}
     // 
+    let prompt_for_chat = String(llmSettingValues['llmChatPrompt']);
     //
     const chat_head = `Response from ${apiModel}:`;  // 不需要加粗
     const chat_tail = '**End of response**';
@@ -127,10 +129,15 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         //
         // Chat message list
         if(query_type === 'chat' && chatType == 1){
-            prompt_head = dictText['prompt_chat'];
+            if(prompt_for_chat.trim() === ''){
+                prompt_head = dictText['prompt_chat'];
+            }
+            else{
+                prompt_head = prompt_for_chat.trim();
+            }           
         }
         prompt_messages.push({ role: 'system', content: prompt_head});
-        if(query_type === 'chat'&& chatType == 1){
+        if(query_type === 'chat' && chatType == 1){
             let lstSplited = splitText(inp_str);
             prompt_messages = prompt_messages.concat(lstSplited);
             console.log(prompt_messages);
@@ -143,7 +150,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     // waiting 动效
     //
     const animation_interval = 150;
-    const show_waiting = true;
+    const show_waiting = Number(llmSettingValues['llmWaitAnimation']) === 1;
     let wait_interval = null;
     let wait_progress_str = '';
     let tmp_cur_pos_wait = await joplin.commands.execute('editor.execCommand', {

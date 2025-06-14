@@ -60,15 +60,20 @@ export function getTxt(lan='en') {
     dictText['max_tokens_desc']=isZH?'限制模型的输出长度，建议值：1024, 2048, 4096等。这个值过大可能导致模型报错。':'Num of max tokens. e.g. 1024, 2048, 4096. Too large may cause llm error.'
     dictText['chat_type_label']=isZH?'聊天高级模式（测试版）':'Advanced Chat Mode (beta)'
     dictText['chat_type_desc']=isZH?'针对聊天特性优化前文解析，包括拆分对话角色、跳过推理模型 think 部分等功能。':'Optimize the parsing of previous text for chat features, including splitting dialogue roles, skipping the think part of the reasoning model, and other functions.'
-    dictText['chat_skip_think_label']=isZH?'隐藏推理模型的 think 文本':'Hide "think" texts of Reasoning models'
+    dictText['chat_skip_think_label']=isZH?'隐藏推理模型的思考内容（测试版）':'Hide "think" texts of Reasoning models (beta)'
     dictText['chat_skip_think_desc']=isZH?'不显示推理模型think部分的文本。ON：推理执行但不显示(非推理模型不受影响)。OFF：显示完整推理内容。':'ON: Hide texts between <think> and </think>; non-reasoning models are unaffected. OFF: Display full thinking content as in the original text.'
+    dictText['wait_animation_label']=isZH?'等待期间显示动画（测试版）':'Animation for waiting (beta)'
+    dictText['wait_animation_desc']=isZH?'在等待期间显示动画，而不是完全停滞。':'Show animation while waiting.'
     //
-    dictText['prompt_chat']=isZH?'你是用户的助手。你的任务是以对话的方式，基于用户前文提供的信息，以对话的形式回复最后的段落。请注意，回复完成之后不要额外追问。':`You are helpful assistant. You are operating in a wiki environment. Your task is to respond to the final paragraph in a conversational manner based on the information provided by the user previously. Please note that you should not ask additional follow-up questions after your response.`;
+    dictText['prompt_chat']=isZH?'你是用户的助手。你的任务是基于用户前文提供的信息，回复最后的段落。请注意，回复完成之后不要额外追问。':`You are helpful assistant. You are operating in a wiki environment. Your task is to respond to the final paragraph in a conversational manner based on the information provided by the user previously. Please note that you should not ask additional follow-up questions after your response.`;
     dictText['prompt_summary']=isZH?`任务要求：请简要概括上文的主要内容，并用列表的方式提炼要点.`:'Your task: Briefly summarize the main content of the above text and list the key points. Use same language as given texts, unless explicitly requested otherwise.'
     dictText['prompt_improve_1']=isZH?'你的任务是帮助用户完善文档。':'Your task is improving documents.'
     dictText['prompt_improve_2']=isZH?`请帮助用户完善文档。参考前后文及其关联关系，按'command'部分的要求，改进'text_selected'部分的文本表达。请直接回复最终结果，不需要额外的文字，严禁修改其余任何部分。不需要抄写 text_before_selection 或 text_after_selection。`:`Please help the user improve their document. Based on the context and relationships between preceding and following text, improve the expression of the 'text_selected' portion according to the requirements in the 'command' section. Please respond with only the final result, without additional text, and do not modify any other parts. Do not copy the text_before_selection or text_after_selection.`
     dictText['prompt_ask_1']=isZH?'接下来用户会针对选中的部分提问。':'User will ask about selection.'
     dictText['prompt_ask_2']=isZH?`任务说明: 请参考前后文及其关联关系，针对 “text_selected” 部分提供的内容，回复用户在"user_command"所提出的问题。请直接回复最终结果，不需要抄写 text_before_selection 或 text_after_selection。`:`Task description: Please refer to the preceding and following text and their relationships, and address the user's question raised in "user_command" regarding the content provided in "text_selected". Please respond with only the final result, without copying "text_before_selection" or "text_after_selection".`
+    //
+    dictText['chat_prompt_label']=isZH?'自定义聊天提示词':'Prompt for chatting'
+    dictText['chat_prompt_desc']=isZH?'如果留空，则使用默认提示词， 即：'+ dictText['prompt_chat']:'Use default prompt if empty: '+dictText['prompt_chat']
     //
     return dictText;
 }
