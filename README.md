@@ -76,7 +76,8 @@ And, in the top menu under Tools / NoteLLM, find quick access to all functions. 
 
 # Update Logs
 
-- v0.4.13, 2025-05-25. (1) New animation for the waiting period. (2) Bug fixed: Stop running if note changed unexpectedly.
+- v0.4.14, 2025-06-14. We can set our own prompt for chatting now.
+- v0.4.13, 2025-05-25. (1) Added animation for waiting. (2) Bug fixed: Stop running if note changed unexpectedly.
 - v0.4.12, 2025-05-17. (1) We can hide contexts between `<think>` and `</think>` now. (2) Maintaining the cursor's position during generation, in order to avoid text input position errors caused by cursor movement.
 - v0.4.11, 2025-05-04. New promo_tile.
 - v0.4.10, 2025-05-04. New advanced chat mode. Optimize the parsing of previous text based on chat characteristics, including splitting dialogue roles, skipping the 'think' part of the reasoning model, and other functions.
