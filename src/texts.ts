@@ -75,5 +75,14 @@ export function getTxt(lan='en') {
     dictText['chat_prompt_label']=isZH?'自定义聊天提示词':'Prompt for chatting'
     dictText['chat_prompt_desc']=isZH?'如果留空，则使用默认提示词， 即：'+ dictText['prompt_chat']:'Use default prompt if empty: '+dictText['prompt_chat']
     //
+    dictText['err_cors']=isZH?'可能原因： (1) 网络错误； (2) 大模型服务器 CORS 配置禁止跨域.':'This is (1) network error, or (2) LLM server CORS.'
+    dictText['err_llm_conf']=isZH?'LLM配置错误，请检查 url, key 和 model 是否正确。':'LLM url, key or model is empty!'
+    dictText['err_markdown']=isZH?'本插件只能工作在 markdown 编辑模式，请检查编辑器模式状态。':'Maybe you are not in markdown mode?'
+    dictText['err_note_changed']=isZH?'笔记似乎被切换了，输出强制中断。':'Note changed unexpectedly.'
+    dictText['err_wrong']=isZH?'未知错误，请检查插件日志了解详细信息。':'Sorry, something went wrong. Please check plugin logs for detail.'
+    dictText['err_no_command']=isZH?'请输入你的任务要求。':'Please input your command.'
+    dictText['err_no_selection']=isZH?'请先选中一些文本。':'Please select some text first.'
+    dictText['err_no_ask']=isZH?'请选择你想要提问的文本。':'Please select where you want to ask.'
+    //
     return dictText;
 }

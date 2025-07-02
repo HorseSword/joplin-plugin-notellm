@@ -84,7 +84,7 @@ joplin.plugins.register({
 					// 
 					// 判断是否在markdown模式
 					if (typeof(await joplin.commands.execute('editor.execCommand', { name: 'cm-getSelectionInfo' })) === 'boolean'){
-						alert('ERROR 124: Maybe you are not in markdown mode?');
+						alert('ERROR 124: ' + dictText['err_markdown']);
 						return;
 					}
 					if (dict_selection.is_selection_exists){
@@ -134,7 +134,7 @@ joplin.plugins.register({
 					// 
 					// 判断是否在markdown模式
 					if (typeof(await joplin.commands.execute('editor.execCommand', { name: 'cm-getSelectionInfo' })) === 'boolean'){
-						alert('ERROR 124: Maybe you are not in markdown mode?');
+						alert('ERROR 124: '+ dictText['err_markdown']);
 						return;
 					}			
 					//
@@ -156,7 +156,7 @@ joplin.plugins.register({
 							return
 						}
 						else if (user_command.length<=0){
-							alert('Please input your command.');
+							alert(dictText['err_no_command']);
 							return
 						}
 						//
@@ -182,8 +182,7 @@ joplin.plugins.register({
 						});
 					}
 					else{
-						alert('Please select some text first.');
-						// await (joplin.views.dialogs as any).showToast({message:'Please select some text first.', duration:3000+(Date.now()%100), type:'error',timestamp: Date.now()});
+						alert(dictText['err_no_selection']);
 					}
 				}
 				catch(error){
@@ -205,7 +204,7 @@ joplin.plugins.register({
 					// 
 					// 判断是否在markdown模式
 					if (typeof(await joplin.commands.execute('editor.execCommand', { name: 'cm-getSelectionInfo' })) === 'boolean'){
-						alert('ERROR 124: Maybe you are not in markdown mode?');
+						alert('ERROR 124: ' + dictText['err_markdown']);
 						return;
 					}
 					//
@@ -253,8 +252,7 @@ joplin.plugins.register({
 						console.info('Streaming complete!');
 					}
 					else{
-						alert('Please select where you want to ask.');
-						// await (joplin.views.dialogs as any).showToast({message:'Please select some text first.', duration:3000+(Date.now()%100), type:'error',timestamp: Date.now()});
+						alert(dictText['err_no_ask']);
 					}
 				}
 				catch(error){
@@ -277,7 +275,7 @@ joplin.plugins.register({
 				try { 
 					// 判断是否在markdown模式
 					if (typeof(await joplin.commands.execute('editor.execCommand', { name: 'cm-getSelectionInfo' })) === 'boolean'){
-						alert('ERROR 124: Maybe you are not in markdown mode?');
+						alert('ERROR 124: '+ dictText['err_markdown']);
 						return;
 					}
 					else{
@@ -305,7 +303,7 @@ joplin.plugins.register({
 				catch(error){
 					if (error.message.includes('Failed to fetch')){
 						console.error('Error 307:', error);
-						alert(`Error 307: ${error}. This caused by your network or LLM server CORS.`);
+						alert(`Error 307: ${error}. ${dictText['err_cors']}`);
 					}
 					else{
 						console.error('Error 295:', error);
