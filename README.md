@@ -76,6 +76,7 @@ And, in the top menu under Tools / NoteLLM, find quick access to all functions. 
 
 # Update Logs
 
+- v0.4.16, 2025-07-06. Small bug fixed.
 - v0.4.15, 2025-07-01. Optimized some animation effects.
 - v0.4.14, 2025-06-14. We can set our own prompt for chatting now.
 - v0.4.13, 2025-05-25. (1) Added animation for waiting. (2) Bug fixed: Stop running if note changed unexpectedly.

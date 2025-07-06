@@ -1,12 +1,20 @@
 import joplin from 'api';
 import { lineNumbers  } from "@codemirror/view";
-import { EditorView } from "@codemirror/view";
+import { EditorView, DecorationSet, Decoration, WidgetType } from "@codemirror/view";
+import { StateField, StateEffect  } from "@codemirror/state";
 import {llmReplyStream} from './my_utils';
+
+/*
+用法：
+await joplin.commands.execute('editor.execCommand', {
+    name: 'cm-scrollToCursor' 
+});
+*/
 
 export default (_context: { contentScriptId: string, postMessage: any }) => {
     return {
         plugin: (codeMirrorWrapper: any) => {
-            const view: EditorView = codeMirrorWrapper.editor;
+            const view: EditorView = codeMirrorWrapper.editor;  // CodeMirror6 
             //
             /**
              * 获取当前选区信息
@@ -48,6 +56,12 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                     endPosition: { line: endLine.number, column: endCol } // 选区结束位置
                 };
             }
+            codeMirrorWrapper.registerCommand("cm-getSelectionInfo", () => {
+                const info = getSelectionInfo();
+                console.log("选区信息:", info); // 在控制台打印
+                return info; // 返回数据
+            });
+
             /**
              * 滚动到光标所在位置
              */
@@ -60,6 +74,10 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                     // end center
                 });
             }
+            codeMirrorWrapper.registerCommand("cm-scrollToCursor", () => {
+                scrollToCursor();
+            });
+            
             /**
              * 移动光标到选区末尾
              * 
@@ -72,6 +90,10 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                     scrollIntoView: true // 确保光标可见
                 });
             }
+            codeMirrorWrapper.registerCommand("cm-moveCursorToSelectionEnd", () => {
+                moveCursorToSelectionEnd();
+            });
+
             /**
              * 修改范围内的内容
              * 
@@ -86,6 +108,10 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                     // selection: { anchor: fromPos + newStr.length },
                 });
             }
+            codeMirrorWrapper.registerCommand("cm-replaceRange", (fromPos:number, toPos:number, newStr:string) => {
+                replaceRange(fromPos, toPos, newStr);
+            });
+
             /**
              * 移动光标位置
              * 
@@ -96,6 +122,10 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                     scrollIntoView: true // 确保光标可见
                 });
             }
+            codeMirrorWrapper.registerCommand("cm-moveCursorPosition", (position) => {
+                moveCursorPosition(position);
+            });
+
             /**
              * 获得当前行
              * 
@@ -127,6 +157,11 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                     endCol: endCol
                 };
             }
+            codeMirrorWrapper.registerCommand("cm-getCursorPos", () => {
+                let cursor_pos = getCursorPos();
+                return cursor_pos;
+            });
+
             /**
              * 输入文本。
              */
@@ -138,33 +173,92 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                     changes: { from: cursorPos, insert: inp_str } // 在光标位置插入文本
                 });
             }
-            /**
-             * **注册 CodeMirror 命令**
-             */
-            codeMirrorWrapper.registerCommand("cm-getSelectionInfo", () => {
-                const info = getSelectionInfo();
-                console.log("选区信息:", info); // 在控制台打印
-                return info; // 返回数据
-            });
-            codeMirrorWrapper.registerCommand("cm-scrollToCursor", () => {
-                scrollToCursor();
-            });
-            codeMirrorWrapper.registerCommand("cm-moveCursorToSelectionEnd", () => {
-                moveCursorToSelectionEnd();
-            });
-            codeMirrorWrapper.registerCommand("cm-moveCursorPosition", (position) => {
-                moveCursorPosition(position);
-            });
-            codeMirrorWrapper.registerCommand("cm-getCursorPos", () => {
-                let cursor_pos = getCursorPos();
-                return cursor_pos;
-            });
-            codeMirrorWrapper.registerCommand("cm-myInsertText", (inp_str) => {
+            codeMirrorWrapper.registerCommand("cm-myInsertText", (inp_str:string) => {
                 myInsertText(inp_str);
             });
-            codeMirrorWrapper.registerCommand("cm-replaceRange", (fromPos,toPos,newStr) => {
-                replaceRange(fromPos,toPos,newStr);
+            //
+            // ====== TEST ===== ======== =========== === ========= ======== 
+            //            
+            /**
+             * 悬浮控件
+             */
+            // 1. 创建星星组件
+            class StarWidget extends WidgetType {
+                toDOM(): HTMLElement {
+                    const star = document.createElement("span")
+                    star.textContent = "★"
+                    star.style.color = "red"
+                    return star
+                }
+            }
+
+            // 2. 定义两个操作：显示星星和隐藏星星
+            const showStarEffect = StateEffect.define<number>() // 传入位置
+            const hideStarEffect = StateEffect.define<number>() // 传入位置
+
+            // 3. 创建状态管理器
+            const starField = StateField.define<DecorationSet>({
+                create() {
+                    return Decoration.none // 初始状态：没有星星
+                },
+                
+                update(decorations, tr) {
+                    // 当文档变化时，更新星星位置
+                    decorations = decorations.map(tr.changes)
+                    
+                    // 处理显示/隐藏操作
+                    for (const effect of tr.effects) {
+                    if (effect.is(showStarEffect)) {
+                        const pos = effect.value
+                        // 在指定位置添加星星
+                        decorations = decorations.update({
+                        add: [Decoration.widget({
+                            widget: new StarWidget(),
+                            side: 1
+                        }).range(pos)]
+                        })
+                    }
+                    
+                    if (effect.is(hideStarEffect)) {
+                        const pos = effect.value
+                        // 移除指定位置的星星
+                        decorations = decorations.update({
+                        filter: (from, to) => from !== pos
+                        })
+                    }
+                    }
+                    
+                    return decorations
+                },
+                
+                provide: f => EditorView.decorations.from(f)
+            })
+
+            // 4. 导出扩展和操作函数
+            const starExtension = starField
+
+            function showStar(view: EditorView, pos: number) {
+                view.dispatch({
+                    effects: showStarEffect.of(pos)
+                })
+            }
+
+            function hideStar(view: EditorView, pos: number) {
+                view.dispatch({
+                    effects: hideStarEffect.of(pos)
+                })
+            }
+            //
+            codeMirrorWrapper.registerCommand("cm-myAddDecoration", (pos:number) => {
+                const view: EditorView = codeMirrorWrapper.editor;
+                showStar(view, pos)
             });
+            codeMirrorWrapper.registerCommand("cm-myRemoveDecoration", (pos:number) => {
+                const view: EditorView = codeMirrorWrapper.editor;
+                hideStar(view, pos)
+            });
+            //
+            //
         },
     };
 };

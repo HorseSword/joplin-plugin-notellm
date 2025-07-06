@@ -20,7 +20,7 @@ joplin.plugins.register({
         joplin.contentScripts.register(
             ContentScriptType.CodeMirrorPlugin,
             contentScriptId,
-            './contentScript.js',
+            './contentScript.js',  //  contentScript.js is built from contentScript.ts
         );
 		//
 		// 设置项

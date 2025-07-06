@@ -71,9 +71,10 @@ class TextProgressAnimator {
         this.animation_index = 0;
         this.is_running = false;
         this.animationStates = [
-            `(${anim_text}......)`, `(.${anim_text}.....)`, `(..${anim_text}....)`, `(...${anim_text}...)`, 
-            `(....${anim_text}..)`, `(.....${anim_text}.)`, `(......${anim_text})`, 
-            `(.....${anim_text}.)`, `(....${anim_text}..)`, `(...${anim_text}...)`, `(..${anim_text}....)`, `(.${anim_text}.....)`,
+            `(${anim_text}......)`, `(.${anim_text}.....)`, `(..${anim_text}....)`, 
+            `(...${anim_text}...)`, `(....${anim_text}..)`, `(.....${anim_text}.)`, 
+            `(......${anim_text})`, `(.....${anim_text}.)`, `(....${anim_text}..)`, 
+            `(...${anim_text}...)`, `(..${anim_text}....)`, `(.${anim_text}.....)`,
         ];
     }
 
@@ -90,20 +91,20 @@ class TextProgressAnimator {
             let current_note = await joplin.workspace.selectedNote();
             this.note_id = current_note.id;
             this.is_running = true;
+            //
+            // 获取当前的光标位置
+            let tmp_cur_pos = await joplin.commands.execute('editor.execCommand', {
+                name: 'cm-getCursorPos'
+            });
+            this.animation_start_pos = tmp_cur_pos.startLine.from + tmp_cur_pos.startPosition.column;
+            this.animation_end_pos = this.animation_start_pos;
+            this.animation_index = 0;
         }
         catch {
             this.note_id = null;
             this.is_running = false;
             return;
         }
-        //
-        // 获取当前的光标位置
-        let tmp_cur_pos = await joplin.commands.execute('editor.execCommand', {
-            name: 'cm-getCursorPos'
-        });
-        this.animation_start_pos = tmp_cur_pos.startLine.from + tmp_cur_pos.startPosition.column;
-        this.animation_end_pos = this.animation_start_pos;
-        this.animation_index = 0;
         //
         // 立即执行第一次动画，然后设置下一次的延时
         this.animate();
@@ -179,8 +180,9 @@ class TextProgressAnimator {
  * 这个函数的作用是，根据传入的文本，流式返回结果。
  */
 export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
-    is_selection_exists=true, str_before='', str_after=''}){
+    is_selection_exists=true, str_before='', str_after=''}) {
     //
+    const head_tail_n_cnt = 1
     const locale = await joplin.settings.globalValue('locale');
     let dictText = getTxt(locale);
     //
@@ -228,11 +230,13 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     // 高级参数
     let apiTemperature = llmSettingValues['llmTemperature'];
     apiTemperature = parseFloat(String(apiTemperature));
+    //
     let apiMaxTokens = llmSettingValues['llmMaxTokens']
     apiMaxTokens = parseInt(String(apiMaxTokens)) ;
     //
     let llmScrollType = llmSettingValues['llmScrollType']
     llmScrollType = parseInt(String(llmScrollType)) ;
+    //
     let platform = 'desktop';
     if (llmScrollType==1){platform = 'desktop'}
     else if (llmScrollType==2){platform = 'mobile'}
@@ -243,6 +247,9 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     const chat_head = `Response from ${apiModel}:`;  // 不需要加粗
     const chat_tail = '**End of response**';
     //
+    // 文字动效参数
+    const ANIMATION_INTERVAL_MS = 100;
+    //
     // ===============================================================
     // 实时更新笔记中的回复
     // 
@@ -250,14 +257,11 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     const insertContentToNote = async (new_text: string) => {
         result += new_text; // 将新内容拼接到结果中
         await joplin.commands.execute('insertText', new_text); // 插入最新内容到笔记
-        // await joplin.commands.execute('editor.execCommand', {name: 'cm-myInsertText', arguments:[new_text]});
     };
-    //
     // 光标移动到选区最末尾
     await joplin.commands.execute('editor.execCommand', {name: 'cm-moveCursorToSelectionEnd'});
-    //
     // 打印 chat_head
-    await insertContentToNote(`\n\n**${chat_head}**\n`);
+    await insertContentToNote(`\n\n**${chat_head}**`+'\n'.repeat(head_tail_n_cnt));
     // 滚动条移动到光标位置
     await scroll_to_view(platform);
     // 
@@ -291,89 +295,17 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
             prompt_messages.push({ role: 'user', content: inp_str });
         }
     }
-    // 文字动效参数
-    const animation_interval = 100;
     //
     // waiting 动效
     //
     const show_waiting = Number(llmSettingValues['llmWaitAnimation']) === 1;
-    const waitingAnimator = new TextProgressAnimator(animation_interval, show_waiting, 'Waiting'); 
+    const waitingAnimator = new TextProgressAnimator(ANIMATION_INTERVAL_MS, show_waiting, 'Waiting'); 
     try {
         await waitingAnimator.start();
     }
     catch {
         await waitingAnimator.stop();
     }
-    /*
-    const show_waiting = Number(llmSettingValues['llmWaitAnimation']) === 1;
-    let wait_interval = null;
-    let wait_progress_str = '';
-    let tmp_cur_pos_wait = await joplin.commands.execute('editor.execCommand', {
-                            name: 'cm-getCursorPos' 
-                        });
-    let wait_start_pos = tmp_cur_pos_wait.startLine.from + tmp_cur_pos_wait.startPosition.column;
-    let wait_end_pos = wait_start_pos;
-    let wait_index = 0;
-    //
-    async function startWaitingProgress(note_id:string) {
-        if (wait_interval) return;
-        if (show_waiting){
-            tmp_cur_pos_wait = await joplin.commands.execute('editor.execCommand', {
-                    name: 'cm-getCursorPos' 
-                });
-            wait_start_pos = tmp_cur_pos_wait.startLine.from + tmp_cur_pos_wait.startPosition.column;
-            wait_end_pos = wait_start_pos;
-            wait_progress_str = '';
-            //
-            wait_interval = setInterval(async() => {
-                //
-                let tmp_current_note = await joplin.workspace.selectedNote();
-                if (tmp_current_note.id === note_id){
-                    //
-                    const waitStates = ['(Waiting...)', '(.Waiting..)', '(..Waiting.)', '(...Waiting)', '(..Waiting.)',  '(.Waiting..)'];
-                    if (wait_index > waitStates.length || wait_index < 0) wait_index = 0; // 如果不在数组中，从第一个状态开始
-                    else wait_index = (wait_index + 1) % waitStates.length;
-                    wait_progress_str = waitStates[wait_index];
-                    //
-                    // console.log(think_start_pos, think_end_pos, think_progress_str);
-                    
-                    // 更新提示符
-                    await joplin.commands.execute('editor.execCommand', {
-                        name: 'cm-replaceRange',
-                        args: [wait_start_pos, wait_end_pos, wait_progress_str]
-                    });
-                    wait_end_pos = wait_start_pos + wait_progress_str.length;
-                }
-                else{
-                    throw new RangeError("ERROR: Note changed unexpectedly.");
-                }
-            }, animation_interval);
-        }
-    }
-    async function stopWaitingProgress(is_current_note=true) {
-        if (wait_interval) {
-            clearInterval(wait_interval);
-            wait_interval = null;
-            //
-            wait_end_pos = wait_start_pos + wait_progress_str.length;
-            wait_progress_str = '';
-            if(is_current_note){
-                await joplin.commands.execute('editor.execCommand', {
-                                    name: 'cm-replaceRange',
-                                    args: [wait_start_pos,wait_end_pos,'']
-                });
-            }
-        }
-    }
-    try{
-        let tmp_current_note = await joplin.workspace.selectedNote();
-        await startWaitingProgress(tmp_current_note.id);
-    }
-    catch(err){
-        console.warn('ERROR_197',err);
-        await stopWaitingProgress();
-    }
-    */
     //
     // 构造请求体
     let requestBody = {
@@ -396,7 +328,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     }
     //
     // 发起 HTTP 请求
-    let response;
+    let response:any;
     try{
         let dict_headers = {
             'Content-Type': 'application/json',
@@ -421,7 +353,6 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         }
     }
     catch(err){  // 这里如果出错，最可能的是CORS限制。此时得到的response是空对象。
-        // await stopWaitingProgress();
         await waitingAnimator.stop();
         //
         if (err.message.includes('Failed to fetch')){
@@ -435,7 +366,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         return;
     }   
     finally{
-        //
+        // 此处暂时没有需要做的
     }
     //
     // 解析流式响应
@@ -450,106 +381,40 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     //
     // think part
     const hide_thinking = Number(llmSettingValues['llmChatSkipThink']) === 1;
-    const thinkingAnimator = new TextProgressAnimator(animation_interval, hide_thinking, 'Thinking'); 
+    const thinkingAnimator = new TextProgressAnimator(ANIMATION_INTERVAL_MS, hide_thinking, 'Thinking'); 
     let thinking_status = 'not_started';
-    /*
-    let think_interval = null;  // think计时器
-    let think_progress_str = '';
-
-    let tmp_cur_pos_think = await joplin.commands.execute('editor.execCommand', {
-                            name: 'cm-getCursorPos' 
-                        });
-    let think_start_pos = tmp_cur_pos_think.startLine.from + tmp_cur_pos_think.startPosition.column;
-    let think_end_pos = think_start_pos;
-    let think_index = 0;
-    //
-    // 开启 think 计时器
-    async function startThinkingProgress() {
-        //
-        // await stopWaitingProgress();
-        await waitingAnimator.stop();
-        //
-        if (think_interval) return;
-        tmp_cur_pos_think = await joplin.commands.execute('editor.execCommand', {
-                            name: 'cm-getCursorPos' 
-                        });
-        if (hide_thinking){
-            think_start_pos = tmp_cur_pos_think.startLine.from + tmp_cur_pos_think.startPosition.column;
-            think_end_pos = think_start_pos;
-            think_progress_str = '';
-            //
-            think_interval = setInterval(async() => {
-                const thinkStates = ['(Thinking...)', '(.Thinking..)', '(..Thinking.)', '(...Thinking)', '(..Thinking.)',  '(.Thinking..)'];
-                if (think_index > thinkStates.length || think_index < 0) think_index = 0; // 如果不在数组中，从第一个状态开始
-                else think_index = (think_index + 1) % thinkStates.length;
-                think_progress_str = thinkStates[think_index];
-                //
-                // console.log(think_start_pos, think_end_pos, think_progress_str);
-                // 更新提示符
-                await joplin.commands.execute('editor.execCommand', {
-                    name: 'cm-replaceRange',
-                    args: [think_start_pos, think_end_pos, think_progress_str]
-                });
-                think_end_pos = think_start_pos + think_progress_str.length;
-            }, animation_interval);
-        }
-    }
-    //
-    // 关闭 think 计时器
-    async function stopThinkingProgress(is_current_note=true) {
-        if (think_interval) {
-            clearInterval(think_interval);
-            think_interval = null;
-            //
-            think_end_pos = think_start_pos + think_progress_str.length;
-            think_progress_str = '';
-            if(is_current_note){
-                await joplin.commands.execute('editor.execCommand', {
-                                    name: 'cm-replaceRange',
-                                    args: [think_start_pos,think_end_pos,'']
-                });
-            }
-        }
-    }
-    */
     //
     // 开始思考
     async function think_start(){
-        // await startThinkingProgress();
         await thinkingAnimator.start();
     }
-    //
     // 思考中
     async function think_going(){
     }
-    //
     // 结束思考
     async function think_end(){
-        //
-        // await stopThinkingProgress();
         await thinkingAnimator.stop();
     }
+    //
+    // 输出解析部分
+    //
     try{
-        let cur_pos;
+        let cur_pos:any;
         //
-        let current_note = await joplin.workspace.selectedNote();
+        let start_note = await joplin.workspace.selectedNote(); 
         while (true) {
             //
             // 切换笔记后退出
-            let tmp_current_note = await joplin.workspace.selectedNote();
-            if (tmp_current_note.id != current_note.id){
+            let current_note = await joplin.workspace.selectedNote();
+            if (current_note.id != start_note.id){
                 alert('ERROR: ' + dictText['err_note_changed'])
-                // await stopWaitingProgress(false);
-                // await stopThinkingProgress(false);
                 await waitingAnimator.stop();
                 await thinkingAnimator.stop();
                 return;  
             }
             // 连续失败后退出
             if (fail_count >= FAIL_COUNT_MAX) {
-                alert(dictText['err_wrong'])
-                // await stopWaitingProgress();
-                // await stopThinkingProgress();
+                alert(dictText['err_wrong'])                
                 await waitingAnimator.stop();
                 await thinkingAnimator.stop();
                 break;  
@@ -557,8 +422,6 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
             //
             const { done, value } = await reader.read();
             if (done) {
-                // await stopWaitingProgress();
-                // await stopThinkingProgress();
                 await waitingAnimator.stop();
                 await thinkingAnimator.stop();
                 break; // 流结束时退出循环
@@ -590,9 +453,6 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
                         if (new_content.trim().length >0){  // 如果有返回值了；
                             // 先停止waiting提示
                             await waitingAnimator.stop();
-                            // if(wait_interval){
-                                // await stopWaitingProgress();
-                            // }
                         }
                         //
                         if (thinking_status === 'not_started') {
@@ -601,10 +461,6 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
                             if (new_content.trim() === '<think>'){
                                 // // 保险起见，先停一下
                                 await waitingAnimator.stop();  
-                                // if(wait_interval){
-                                    // await stopWaitingProgress();                                    
-                                // }
-                                //
                                 thinking_status = 'thinking'
                                 // 
                                 // 思考期间的等待可视化
@@ -614,11 +470,12 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
                                 }
                             }
                             else{
+                                // 如果不是 <think> 开头，说明不是推理模式，直接跳过
                                 thinking_status = 'think_finished';
                             }
                         }
-                        else if(thinking_status === 'thinking'){
-                            if (new_content.trim() === '</think>'){
+                        else if(thinking_status === 'thinking') {  // 如果已经在思考中了
+                            if (new_content.trim() === '</think>'){  // 结束思考的标志
                                 thinking_status = 'think_ends';
                                 await think_end();
                             }
@@ -700,20 +557,20 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         //
         // 收尾工作
         try{
-            if (need_add_head){ // 万一总长度不足导致上面没有执行；
+            // 万一总长度不足导致上面没有执行；
+            if (need_add_head){ 
                 await insertContentToNote(output_str);
             }
-            if (output_str.trim().endsWith(chat_tail)){
+            // 防止大模型抽风，重复输出手动设定的结束语。
+            if (output_str.trim().endsWith(chat_tail)){  
                 await insertContentToNote('\n\n');
             }
-            else{
-                await insertContentToNote(`\n${chat_tail}\n\n`);
+            else{  // 正常情况，由程序输出结束语
+                await insertContentToNote('\n'.repeat(head_tail_n_cnt) + `${chat_tail}\n\n`);
             }
+            //
             await scroll_to_view(platform);
-            //
-
-            //
-            // 完成
+            // 显示完成提示
             await (joplin.views.dialogs as any).showToast({
                 message:'Finished.', 
                 duration:2500+(Date.now()%500), 
@@ -730,7 +587,6 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     }
     finally{
         try{
-            // await stopWaitingProgress();
             await waitingAnimator.stop();
         }
         catch(err){
@@ -738,7 +594,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         }
         //
         try{
-            // await stopThinkingProgress();
+            
             await thinkingAnimator.stop();
         }
         catch{
