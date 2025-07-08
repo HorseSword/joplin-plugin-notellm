@@ -120,6 +120,11 @@ class TextProgressAnimator {
      * @param clear_text - 是否需要清除编辑器中的等待文本
      */
     public async stop(clear_text: boolean = true): Promise<void> {
+        //
+        await joplin.commands.execute('editor.execCommand', {
+                name: 'cm-removeFloatingObject',
+            });
+        //
         if (!this.is_running) {
             return;
         }
@@ -137,11 +142,14 @@ class TextProgressAnimator {
             //     name: 'cm-replaceRange',
             //     args: [this.animation_start_pos, this.animation_end_pos, '']  // 删除等待文本
             // });
+            // await joplin.commands.execute('editor.execCommand', {
+            //     name: 'cm-removeLineWidget',
+            //     args: [{ 
+            //         widgetId: this.animation_uuid, 
+            //     }]
+            // });
             await joplin.commands.execute('editor.execCommand', {
-                name: 'cm-removeLineWidget',
-                args: [{ 
-                    widgetId: this.animation_uuid, 
-                }]
+                name: 'cm-removeFloatingObject',
             });
         }
         //
@@ -173,27 +181,38 @@ class TextProgressAnimator {
                 //     args: [this.animation_start_pos, this.animation_end_pos, this.animation_progress_str]
                 // });
                 if (this.animation_end_pos == this.animation_start_pos){
+                    // await joplin.commands.execute('editor.execCommand', {
+                    //     name: 'cm-addLineWidget',
+                    //     args: [{ 
+                    //         line: this.animation_row, 
+                    //         htmlString:`<center>${this.animation_progress_str}</center>`,
+                    //         // htmlString:`<p>${this.animation_progress_str}</p>`,
+                    //         // htmlString:`${this.animation_progress_str}`,
+                    //         widgetId: this.animation_uuid, 
+                    //     }]
+                    // });
                     await joplin.commands.execute('editor.execCommand', {
-                        name: 'cm-addLineWidget',
-                        args: [{ 
-                            line: this.animation_row, 
-                            htmlString:`<center>${this.animation_progress_str}</center>`,
-                            // htmlString:`<p>${this.animation_progress_str}</p>`,
-                            // htmlString:`${this.animation_progress_str}`,
-                            widgetId: this.animation_uuid, 
-                        }]
+                        name: 'cm-addFloatingObject',
+                        args: [{ text: this.animation_progress_str }]
                     });
                 }
                 else {
+                    // await joplin.commands.execute('editor.execCommand', {
+                    //     name: 'cm-updateLineWidget',
+                    //     args: [{ 
+                    //         // line: this.animation_row, 
+                    //         htmlString:`<center>${this.animation_progress_str}</center>`,
+                    //         // htmlString:`${this.animation_progress_str}`,
+                    //         // htmlString:`<p>${this.animation_progress_str}</p>`,
+                    //         widgetId: this.animation_uuid, 
+                    //     }]
+                    // });
+                    // await joplin.commands.execute('editor.execCommand', {
+                    //     name: 'cm-removeFloatingObject',
+                    // });
                     await joplin.commands.execute('editor.execCommand', {
-                        name: 'cm-updateLineWidget',
-                        args: [{ 
-                            // line: this.animation_row, 
-                            htmlString:`<center>${this.animation_progress_str}</center>`,
-                            // htmlString:`${this.animation_progress_str}`,
-                            // htmlString:`<p>${this.animation_progress_str}</p>`,
-                            widgetId: this.animation_uuid, 
-                        }]
+                        name: 'cm-addFloatingObject',
+                        args: [{ text: this.animation_progress_str }]
                     });
                 }
 
@@ -298,7 +317,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     const chat_tail = '**End of response**';
     //
     // 文字动效参数
-    const ANIMATION_INTERVAL_MS = 100;
+    const ANIMATION_INTERVAL_MS = 120;
     //
     // ===============================================================
     // 实时更新笔记中的回复

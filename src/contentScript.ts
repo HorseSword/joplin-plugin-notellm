@@ -272,7 +272,7 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                             let posOfOldWidget = -1;
 
                             widgets.between(0, tr.state.doc.length, (from, to, value) => {
-                                // 【修正】使用 (value as any) 进行类型断言，以访问 .widget 属性
+                                // 使用 (value as any) 进行类型断言，以访问 .widget 属性
                                 const widgetInstance = (value as any).widget;
                                 if (widgetInstance && (widgetInstance as LineWidget).element.dataset.widgetId === widgetId) {
                                     posOfOldWidget = from;
@@ -354,6 +354,68 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
             codeMirrorWrapper.addExtension(lineWidgetField);
             // codeMirrorWrapper.addExtension(lineNumbers());
             //
+            // ================= ================ ==================
+            // 测试悬浮物体
+            /*
+            用法：
+            await joplin.commands.execute('editor.execCommand', {
+                        name: 'cm-addFloatingObject',
+                        args: [{ text: `Hello world` }]
+                    });
+            await joplin.commands.execute('editor.removeCommand', {
+                        name: 'cm-addFloatingObject',
+                    });
+            */
+            //
+            const FLOATING_OBJECT_ID = 'notellm-floating-object';
+            //
+            codeMirrorWrapper.registerCommand("cm-addFloatingObject", 
+                (payload: { text: string }) => {
+                    const { text } = payload;
+
+                    // 1. 检查悬浮对象是否已存在
+                    let floatingEl = document.getElementById(FLOATING_OBJECT_ID);
+
+                    // 2. 如果不存在，则创建它
+                    if (!floatingEl) {
+                        floatingEl = document.createElement('div');
+                        floatingEl.id = FLOATING_OBJECT_ID;
+                        
+                        // 关键：使用 position: fixed 来实现窗口级悬浮
+                        floatingEl.style.position = 'fixed';
+                        // floatingEl.style.right = '20%';
+                        // floatingEl.style.left = '20%';
+                        floatingEl.style.right = '50px';
+                        floatingEl.style.bottom = '50px';
+                        // floatingEl.style.transform = 'translateX(-50%)';
+
+                        // 设置一个较高的 z-index 确保它在 Joplin 其他 UI 之上
+                        floatingEl.style.zIndex = '2048'; 
+                        
+                        // 添加一些样式让它更显眼
+                        floatingEl.style.padding = '10px 15px';
+                        floatingEl.style.boxShadow = '2px 2px 5px rgba(0, 0, 0, 0.3)';
+                        floatingEl.style.backgroundColor = 'rgba(10, 100, 200, 0.7)';
+                        floatingEl.style.color = 'white';
+                        floatingEl.style.borderRadius = '8px';
+                        floatingEl.style.fontFamily = 'sans-serif';
+                        floatingEl.style.fontSize = '14px';
+                        
+                        // 将其添加到主文档的 body 中，而不是编辑器内部
+                        document.body.appendChild(floatingEl);
+                    }
+
+                    // 3. 更新其内容
+                    floatingEl.textContent = text;
+            });
+
+            codeMirrorWrapper.registerCommand("cm-removeFloatingObject", 
+                () => {
+                    const floatingEl = document.getElementById(FLOATING_OBJECT_ID);
+                    if (floatingEl) {
+                        floatingEl.remove();
+                    }
+            });
         },
     };
 };
