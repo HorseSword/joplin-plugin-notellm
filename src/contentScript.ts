@@ -382,11 +382,11 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                         floatingEl.id = FLOATING_OBJECT_ID;
                         
                         // 关键：使用 position: fixed 来实现窗口级悬浮
-                        floatingEl.style.position = 'fixed';
+                        floatingEl.style.position = 'absolute';//'fixed';
                         // floatingEl.style.right = '20%';
                         // floatingEl.style.left = '20%';
-                        floatingEl.style.right = '50px';
-                        floatingEl.style.bottom = '50px';
+                        floatingEl.style.right = '20px';
+                        floatingEl.style.bottom = '20px';
                         // floatingEl.style.transform = 'translateX(-50%)';
 
                         // 设置一个较高的 z-index 确保它在 Joplin 其他 UI 之上
@@ -394,8 +394,8 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                         
                         // 添加一些样式让它更显眼
                         floatingEl.style.padding = '10px 15px';
-                        floatingEl.style.boxShadow = '2px 2px 5px rgba(0, 0, 0, 0.3)';
-                        floatingEl.style.backgroundColor = 'rgba(10, 100, 200, 0.7)';
+                        floatingEl.style.boxShadow = '2px 2px 5px rgba(0, 0, 0, 0.2)';
+                        floatingEl.style.backgroundColor = 'rgba(10, 100, 200, 0.9)';
                         floatingEl.style.color = 'white';
                         floatingEl.style.borderRadius = '8px';
                         floatingEl.style.fontFamily = 'sans-serif';

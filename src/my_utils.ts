@@ -121,13 +121,12 @@ class TextProgressAnimator {
      */
     public async stop(clear_text: boolean = true): Promise<void> {
         //
-        await joplin.commands.execute('editor.execCommand', {
-                name: 'cm-removeFloatingObject',
-            });
-        //
         if (!this.is_running) {
             return;
         }
+        await joplin.commands.execute('editor.execCommand', {
+            name: 'cm-removeFloatingObject',
+        });
         //
         if (this.animation_interval_id) {
             clearTimeout(this.animation_interval_id);
