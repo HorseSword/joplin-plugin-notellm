@@ -199,12 +199,12 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
 
                 toDOM() {
                     console.info('toDOM called')
-                    // const wrap = document.createElement("div");
-                    // wrap.style.display = "block";
-                    // wrap.appendChild(this.element);
-                    // return wrap;
+                    const wrap = document.createElement("div");
+                    wrap.style.display = "block";
+                    wrap.appendChild(this.element);
+                    return wrap;
                     // 直接返回元素，不要额外包装
-                    return this.element;
+                    // return this.element;
                 }
 
                 ignoreEvent() {
@@ -238,7 +238,7 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                                 const lineInfo = tr.state.doc.line(line);
                                 const widget = Decoration.widget({
                                     widget: new LineWidget(element, widgetId),
-                                    block: true,
+                                    block: false,
                                     side: 1,
                                     // spec: { widgetId }
                                 });
@@ -324,12 +324,13 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                     element.dataset.widgetId = widgetId;
                     addLineWidget(line, element, widgetId);
                 }
-                return 'succeed';
+                return 'cm-addLineWidget called successfully';
             });
 
             codeMirrorWrapper.registerCommand("cm-removeLineWidget", ({ widgetId }: { widgetId: string }) => {
                 console.info('cm-removeLineWidget called.')
                 removeLineWidget(widgetId);
+                return 'cm-removeLineWidget called successfully';
             });
 
             codeMirrorWrapper.registerCommand("cm-updateLineWidget", 

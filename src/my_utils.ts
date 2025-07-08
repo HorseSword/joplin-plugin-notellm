@@ -172,21 +172,45 @@ class TextProgressAnimator {
                 //     name: 'cm-replaceRange',
                 //     args: [this.animation_start_pos, this.animation_end_pos, this.animation_progress_str]
                 // });
-                
-                await joplin.commands.execute('editor.execCommand', {
-                    name: 'cm-updateLineWidget',
-                    args: [{ 
-                        widgetId: this.animation_uuid, 
-                    }]
-                });
-                await joplin.commands.execute('editor.execCommand', {
-                    name: 'cm-updateLineWidget',
-                    args: [{ 
-                        line: this.animation_row, 
-                        htmlString:`<center>${this.animation_progress_str}</center>`,
-                        widgetId: this.animation_uuid, 
-                    }]
-                });
+                if (this.animation_end_pos == this.animation_start_pos){
+                    await joplin.commands.execute('editor.execCommand', {
+                        name: 'cm-addLineWidget',
+                        args: [{ 
+                            line: this.animation_row, 
+                            htmlString:`<center>${this.animation_progress_str}</center>`,
+                            // htmlString:`<p>${this.animation_progress_str}</p>`,
+                            // htmlString:`${this.animation_progress_str}`,
+                            widgetId: this.animation_uuid, 
+                        }]
+                    });
+                }
+                else {
+                    await joplin.commands.execute('editor.execCommand', {
+                        name: 'cm-updateLineWidget',
+                        args: [{ 
+                            // line: this.animation_row, 
+                            htmlString:`<center>${this.animation_progress_str}</center>`,
+                            // htmlString:`${this.animation_progress_str}`,
+                            // htmlString:`<p>${this.animation_progress_str}</p>`,
+                            widgetId: this.animation_uuid, 
+                        }]
+                    });
+                }
+
+                // await joplin.commands.execute('editor.execCommand', {
+                //     name: 'cm-removeLineWidget',
+                //     args: [{ 
+                //         widgetId: this.animation_uuid, 
+                //     }]
+                // });
+                // await joplin.commands.execute('editor.execCommand', {
+                //     name: 'cm-addLineWidget',
+                //     args: [{ 
+                //         line: this.animation_row, 
+                //         htmlString:`<center>${this.animation_progress_str}</center>`,
+                //         widgetId: this.animation_uuid, 
+                //     }]
+                // });
                 
                 this.animation_end_pos = this.animation_start_pos + this.animation_progress_str.length;
 
