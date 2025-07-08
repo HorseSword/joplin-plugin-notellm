@@ -1,8 +1,11 @@
-import joplin from 'api';
+console.info('>>> [LineWidget] contentScript.ts SCRIPT HAS BEEN LOADED AND IS EXECUTING <<<');
+
+// import joplin from 'api';
 import { lineNumbers  } from "@codemirror/view";
 import { EditorView, DecorationSet, Decoration, WidgetType } from "@codemirror/view";
 import { StateField, StateEffect  } from "@codemirror/state";
-import {llmReplyStream} from './my_utils';
+// import {llmReplyStream} from './my_utils';
+
 
 /*
 用法：
@@ -10,11 +13,11 @@ await joplin.commands.execute('editor.execCommand', {
     name: 'cm-scrollToCursor' 
 });
 */
-
+// context 参数由 Joplin 框架提供，包含了 contentScriptId 等信息
 export default (_context: { contentScriptId: string, postMessage: any }) => {
     return {
+        // 当 CodeMirror 实例准备好后，此函数会被调用
         plugin: (codeMirrorWrapper: any) => {
-            const view: EditorView = codeMirrorWrapper.editor;  // CodeMirror6 
             //
             /**
              * 获取当前选区信息
@@ -58,7 +61,7 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
             }
             codeMirrorWrapper.registerCommand("cm-getSelectionInfo", () => {
                 const info = getSelectionInfo();
-                console.log("选区信息:", info); // 在控制台打印
+                console.info("选区信息:", info); // 在控制台打印
                 return info; // 返回数据
             });
 
@@ -83,6 +86,7 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
              * 
              */
             function moveCursorToSelectionEnd() {
+                const view: EditorView = codeMirrorWrapper.editor;  // CodeMirror6 
                 const state = view.state;
                 const selection = state.selection.main;
                 view.dispatch({
@@ -99,6 +103,7 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
              * 
              */
             function replaceRange(fromPos, toPos, newStr='') {
+                const view: EditorView = codeMirrorWrapper.editor;  // CodeMirror6 
                 view.dispatch({
                     changes:{
                         from: fromPos,
@@ -117,6 +122,7 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
              * 
              */
             function moveCursorPosition(position) {
+                const view: EditorView = codeMirrorWrapper.editor;  // CodeMirror6 
                 view.dispatch({
                     selection: { anchor: position },
                     scrollIntoView: true // 确保光标可见
@@ -182,82 +188,170 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
             /**
              * 悬浮控件
              */
-            // 1. 创建星星组件
-            class StarWidget extends WidgetType {
-                toDOM(): HTMLElement {
-                    const star = document.createElement("span")
-                    star.textContent = "★"
-                    star.style.color = "red"
-                    return star
+            // 1. 定义要插入的 Widget 的类
+            class LineWidget extends WidgetType {
+                // public widgetId:string;
+                constructor(readonly element: HTMLElement, readonly widgetId:string) {
+                    super();
+                    console.info('LineWidget inited')
+                    // this.widgetId = widgetId;
                 }
+
+                toDOM() {
+                    console.info('toDOM called')
+                    // const wrap = document.createElement("div");
+                    // wrap.style.display = "block";
+                    // wrap.appendChild(this.element);
+                    // return wrap;
+                    // 直接返回元素，不要额外包装
+                    return this.element;
+                }
+
+                ignoreEvent() {
+                    return true;
+                }
+
+                // get estimatedHeight() {
+                //     return 50; // 提供预估高度
+                // }
             }
 
-            // 2. 定义两个操作：显示星星和隐藏星星
-            const showStarEffect = StateEffect.define<number>() // 传入位置
-            const hideStarEffect = StateEffect.define<number>() // 传入位置
+            // 2. 定义操作（Effects）
+            const addLineWidgetEffect = StateEffect.define<{ line: number, element: HTMLElement, widgetId: string }>();
+            const updateLineWidgetEffect = StateEffect.define<{ element: HTMLElement, widgetId: string }>();
+            const removeLineWidgetEffect = StateEffect.define<{ widgetId: string }>();
 
-            // 3. 创建状态管理器
-            const starField = StateField.define<DecorationSet>({
+            // 3. 创建状态管理器 (StateField)
+            const lineWidgetField = StateField.define<DecorationSet>({
                 create() {
-                    return Decoration.none // 初始状态：没有星星
+                    return Decoration.none;
                 },
-                
-                update(decorations, tr) {
-                    // 当文档变化时，更新星星位置
-                    decorations = decorations.map(tr.changes)
-                    
-                    // 处理显示/隐藏操作
+                update(widgets, tr) {
+                    widgets = widgets.map(tr.changes);
+
                     for (const effect of tr.effects) {
-                    if (effect.is(showStarEffect)) {
-                        const pos = effect.value
-                        // 在指定位置添加星星
-                        decorations = decorations.update({
-                        add: [Decoration.widget({
-                            widget: new StarWidget(),
-                            side: 1
-                        }).range(pos)]
-                        })
+                        //
+                        // 添加元素
+                        if (effect.is(addLineWidgetEffect)) {
+                            const { line, element, widgetId } = effect.value;
+                            if (line >= 1 && line <= tr.state.doc.lines) {
+                                const lineInfo = tr.state.doc.line(line);
+                                const widget = Decoration.widget({
+                                    widget: new LineWidget(element, widgetId),
+                                    block: true,
+                                    side: 1,
+                                    // spec: { widgetId }
+                                });
+                                widgets = widgets.update({ add: [widget.range(lineInfo.to)] });
+                            }
+                        }
+                        //
+                        // 删除元素
+                        else if (effect.is(removeLineWidgetEffect)) {
+                            const { widgetId } = effect.value;
+                            let posToRemove = -1;
+
+                            widgets.between(0, tr.state.doc.length, (from, to, value) => {
+                                // 这里使用类型断言
+                                const widgetInstance = (value as any).widget;
+                                if (widgetInstance && (widgetInstance as LineWidget).element.dataset.widgetId === widgetId) {
+                                    posToRemove = from;
+                                    return false;
+                                }
+                            });
+
+                            if (posToRemove > -1) {
+                                widgets = widgets.update({
+                                    filter: (from) => from !== posToRemove
+                                });
+                            }
+                        }
+                        //
+                        else if (effect.is(updateLineWidgetEffect)) {
+                            const { element, widgetId } = effect.value;
+                            let posOfOldWidget = -1;
+
+                            widgets.between(0, tr.state.doc.length, (from, to, value) => {
+                                // 【修正】使用 (value as any) 进行类型断言，以访问 .widget 属性
+                                const widgetInstance = (value as any).widget;
+                                if (widgetInstance && (widgetInstance as LineWidget).element.dataset.widgetId === widgetId) {
+                                    posOfOldWidget = from;
+                                    return false;
+                                }
+                            });
+
+                            if (posOfOldWidget > -1) {
+                                const newWidget = Decoration.widget({
+                                    widget: new LineWidget(element, widgetId),
+                                    block: true,
+                                    side: 1,
+                                });
+                                widgets = widgets.update({
+                                    filter: (from) => from !== posOfOldWidget,
+                                    add: [newWidget.range(posOfOldWidget)]
+                                });
+                            }
+                        }
                     }
-                    
-                    if (effect.is(hideStarEffect)) {
-                        const pos = effect.value
-                        // 移除指定位置的星星
-                        decorations = decorations.update({
-                        filter: (from, to) => from !== pos
-                        })
-                    }
-                    }
-                    
-                    return decorations
+                    return widgets;
                 },
-                
-                provide: f => EditorView.decorations.from(f)
-            })
+                provide: f => EditorView.decorations.from(f),
+            });
 
-            // 4. 导出扩展和操作函数
-            const starExtension = starField
-
-            function showStar(view: EditorView, pos: number) {
+            // 4. 创建辅助函数
+            function addLineWidget(line: number, element: HTMLElement, widgetId: string) {
+                const view: EditorView = codeMirrorWrapper.editor;  // CodeMirror6 
                 view.dispatch({
-                    effects: showStarEffect.of(pos)
-                })
+                    effects: addLineWidgetEffect.of({ line, element, widgetId }),
+                });
             }
 
-            function hideStar(view: EditorView, pos: number) {
+            function removeLineWidget(widgetId: string) {
+                const view: EditorView = codeMirrorWrapper.editor;  // CodeMirror6 
                 view.dispatch({
-                    effects: hideStarEffect.of(pos)
-                })
+                    effects: removeLineWidgetEffect.of({ widgetId }),
+                });
             }
             //
-            codeMirrorWrapper.registerCommand("cm-myAddDecoration", (pos:number) => {
-                const view: EditorView = codeMirrorWrapper.editor;
-                showStar(view, pos)
+            // 5. 注册命令，供 index.ts 调用
+            codeMirrorWrapper.registerCommand("cm-addLineWidget", 
+                ({ line, htmlString, widgetId }: { line: number, htmlString: string, widgetId: string }) => {
+                console.info('cm-addLineWidget called.')
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = htmlString;
+                const element = tempDiv.firstChild as HTMLElement;
+                if (element) {
+                    element.dataset.widgetId = widgetId;
+                    addLineWidget(line, element, widgetId);
+                }
+                return 'succeed';
             });
-            codeMirrorWrapper.registerCommand("cm-myRemoveDecoration", (pos:number) => {
-                const view: EditorView = codeMirrorWrapper.editor;
-                hideStar(view, pos)
+
+            codeMirrorWrapper.registerCommand("cm-removeLineWidget", ({ widgetId }: { widgetId: string }) => {
+                console.info('cm-removeLineWidget called.')
+                removeLineWidget(widgetId);
             });
+
+            codeMirrorWrapper.registerCommand("cm-updateLineWidget", 
+                (payload: { htmlString: string, widgetId: string }) => {
+                    const { htmlString, widgetId } = payload;
+                    const view: EditorView = codeMirrorWrapper.editor;
+                    if (!view) return;
+
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = htmlString;
+                    const element = tempDiv.firstChild as HTMLElement;
+
+                    if (element) {
+                        element.dataset.widgetId = widgetId;
+                        view.dispatch({ effects: updateLineWidgetEffect.of({ element, widgetId }) });
+                    }
+            });
+
             //
+            // 注册为扩展
+            codeMirrorWrapper.addExtension(lineWidgetField);
+            // codeMirrorWrapper.addExtension(lineNumbers());
             //
         },
     };

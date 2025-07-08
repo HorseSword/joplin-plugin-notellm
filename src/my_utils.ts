@@ -46,6 +46,8 @@ class TextProgressAnimator {
     private animation_interval_id: any; // setTimeout 返回的 ID 类型在不同环境（Node/Browser）可能不同，any 是最简单的选择
     private animation_start_pos: number | null;  // 开始位置
     private animation_end_pos: number | null;  // 结束位置
+    private animation_row: number | null;
+    private animation_uuid: string | null;
     private animation_progress_str: string;  // 
     private animation_index: number; // 当前的动画序号
     private is_running: boolean;  // 运行状态
@@ -67,6 +69,8 @@ class TextProgressAnimator {
         this.animation_interval_id = null;
         this.animation_start_pos = null;
         this.animation_end_pos = null;
+        this.animation_row = null;
+        this.animation_uuid = 'widget-' + Date.now();;
         this.animation_progress_str = '';
         this.animation_index = 0;
         this.is_running = false;
@@ -99,6 +103,7 @@ class TextProgressAnimator {
             this.animation_start_pos = tmp_cur_pos.startLine.from + tmp_cur_pos.startPosition.column;
             this.animation_end_pos = this.animation_start_pos;
             this.animation_index = 0;
+            this.animation_row = tmp_cur_pos.endLine.number - 1;
         }
         catch {
             this.note_id = null;
@@ -128,9 +133,15 @@ class TextProgressAnimator {
         }
         //
         if (clear_text) {
+            // await joplin.commands.execute('editor.execCommand', {
+            //     name: 'cm-replaceRange',
+            //     args: [this.animation_start_pos, this.animation_end_pos, '']  // 删除等待文本
+            // });
             await joplin.commands.execute('editor.execCommand', {
-                name: 'cm-replaceRange',
-                args: [this.animation_start_pos, this.animation_end_pos, '']  // 删除等待文本
+                name: 'cm-removeLineWidget',
+                args: [{ 
+                    widgetId: this.animation_uuid, 
+                }]
             });
         }
         //
@@ -157,11 +168,26 @@ class TextProgressAnimator {
                 this.animation_index = (this.animation_index + 1) % this.animationStates.length;
                 this.animation_progress_str = this.animationStates[this.animation_index];
 
+                // await joplin.commands.execute('editor.execCommand', {
+                //     name: 'cm-replaceRange',
+                //     args: [this.animation_start_pos, this.animation_end_pos, this.animation_progress_str]
+                // });
+                
                 await joplin.commands.execute('editor.execCommand', {
-                    name: 'cm-replaceRange',
-                    args: [this.animation_start_pos, this.animation_end_pos, this.animation_progress_str]
+                    name: 'cm-updateLineWidget',
+                    args: [{ 
+                        widgetId: this.animation_uuid, 
+                    }]
                 });
-
+                await joplin.commands.execute('editor.execCommand', {
+                    name: 'cm-updateLineWidget',
+                    args: [{ 
+                        line: this.animation_row, 
+                        htmlString:`<center>${this.animation_progress_str}</center>`,
+                        widgetId: this.animation_uuid, 
+                    }]
+                });
+                
                 this.animation_end_pos = this.animation_start_pos + this.animation_progress_str.length;
 
                 this.animation_interval_id = setTimeout(() => this.animate(), this.animation_interval);

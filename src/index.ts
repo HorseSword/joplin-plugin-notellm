@@ -4,10 +4,6 @@ import {registerSettings, pluginIconName } from './settings';
 import {llmReplyStream, changeLLM} from './my_utils';
 import {getTxt} from './texts';
 
-// import {llmReplyStream} from './my_openai_utils';
-
-// import OpenAI from "openai";
-// import { MenuItemLocation } from 'api/types'; // 导入 MenuItemLocation 类型
 
 joplin.plugins.register({
 	onStart: async function() {
@@ -16,6 +12,7 @@ joplin.plugins.register({
 		const locale = await joplin.settings.globalValue('locale');
 		let dictText = getTxt(locale);
 		//
+		// 注册自定义的 CodeMirror 功能
 		const contentScriptId = 'some-content-script-id';
         joplin.contentScripts.register(
             ContentScriptType.CodeMirrorPlugin,
