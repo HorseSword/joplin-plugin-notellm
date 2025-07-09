@@ -13,7 +13,7 @@ joplin.plugins.register({
 		let dictText = getTxt(locale);
 		//
 		// 注册自定义的 CodeMirror 功能
-		const contentScriptId = 'some-content-script-id';
+		const contentScriptId = 'notellm-content-script-id';
         joplin.contentScripts.register(
             ContentScriptType.CodeMirrorPlugin,
             contentScriptId,
@@ -317,7 +317,6 @@ joplin.plugins.register({
 			'askLLM_menus', // 菜单项 ID
 			'Note_LLM', // 菜单项名称
 			[
-			  
 			  {
 				label: 'askLLM_Chat',
 				commandName: 'askLLMChat', // 绑定的命令

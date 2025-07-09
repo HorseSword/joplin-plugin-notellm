@@ -2,6 +2,10 @@ import { getCurves } from 'crypto';
 import joplin from '../api';
 import {getTxt} from './texts';
 
+const COLOR_FLOAT_FINISH = '#3bba9c'  // 绿色
+const COLOR_FLOAT_SETTING = '#535f80'  // 蓝灰提示
+const COLOR_FLOAT_NORMAL = '#388087' // 青绿色
+const COLOR_FLOAT_WARNING = '#e67235'  // 橙色警告
 /**
  * 对话的消息体类
  */
@@ -70,7 +74,7 @@ class TextProgressAnimator {
         this.animation_start_pos = null;
         this.animation_end_pos = null;
         this.animation_row = null;
-        this.animation_uuid = 'widget-' + Date.now();;
+        this.animation_uuid = 'widget-' + Date.now();
         this.animation_progress_str = '';
         this.animation_index = 0;
         this.is_running = false;
@@ -126,6 +130,7 @@ class TextProgressAnimator {
         }
         await joplin.commands.execute('editor.execCommand', {
             name: 'cm-removeFloatingObject',
+            args: [this.animation_uuid]
         });
         //
         if (this.animation_interval_id) {
@@ -149,6 +154,7 @@ class TextProgressAnimator {
             // });
             await joplin.commands.execute('editor.execCommand', {
                 name: 'cm-removeFloatingObject',
+                args: [this.animation_uuid]
             });
         }
         //
@@ -192,7 +198,7 @@ class TextProgressAnimator {
                     // });
                     await joplin.commands.execute('editor.execCommand', {
                         name: 'cm-addFloatingObject',
-                        args: [{ text: this.animation_progress_str }]
+                        args: [{ text: this.animation_progress_str, floatId: this.animation_uuid }]
                     });
                 }
                 else {
@@ -211,7 +217,7 @@ class TextProgressAnimator {
                     // });
                     await joplin.commands.execute('editor.execCommand', {
                         name: 'cm-addFloatingObject',
-                        args: [{ text: this.animation_progress_str }]
+                        args: [{ text: this.animation_progress_str, floatId: this.animation_uuid }]
                     });
                 }
 
@@ -453,15 +459,18 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     let thinking_status = 'not_started';
     //
     // 开始思考
-    async function think_start(){
+    async function on_think_start(){
         await thinkingAnimator.start();
     }
     // 思考中
     async function think_going(){
     }
     // 结束思考
-    async function think_end(){
+    async function on_think_end(){
         await thinkingAnimator.stop();
+    }
+    async function on_llm_end(){
+
     }
     //
     // 输出解析部分
@@ -533,7 +542,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
                                 // 
                                 // 思考期间的等待可视化
                                 if (hide_thinking){
-                                    await think_start();
+                                    await on_think_start();
                                     continue;
                                 }
                             }
@@ -545,7 +554,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
                         else if(thinking_status === 'thinking') {  // 如果已经在思考中了
                             if (new_content.trim() === '</think>'){  // 结束思考的标志
                                 thinking_status = 'think_ends';
-                                await think_end();
+                                await on_think_end();
                             }
                             if (hide_thinking){
                                 continue;
@@ -639,11 +648,15 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
             //
             await scroll_to_view(platform);
             // 显示完成提示
-            await (joplin.views.dialogs as any).showToast({
-                message:'Finished.', 
-                duration:2500+(Date.now()%500), 
-                type:'success',
-                timestamp: Date.now()
+            // await (joplin.views.dialogs as any).showToast({
+            //     message:'Finished.', 
+            //     duration:2500+(Date.now()%500), 
+            //     type:'success',
+            //     timestamp: Date.now()
+            // });
+            await joplin.commands.execute('editor.execCommand', {
+                name: 'cm-tempFloatingObject',
+                args: [{ text: `Finished.`, floatId:String(2500+(Date.now()%500)), ms:2000, bgColor: COLOR_FLOAT_FINISH}]
             });
         }
         catch(err){
@@ -696,12 +709,17 @@ export async function changeLLM(llm_no=0) {
     console.log(int_target_llm);
     //
     await joplin.settings.setValue('llmSelect', int_target_llm);
-    await (joplin.views.dialogs as any).showToast({
-        message:`LLM ${int_target_llm} selected!`, 
-        duration: 2500+(Date.now()%500), 
-        type:'success',
-        timestamp: Date.now()
-    }); 
+    // await (joplin.views.dialogs as any).showToast({
+    //     message:`LLM ${int_target_llm} selected!`, 
+    //     duration: 2500+(Date.now()%500), 
+    //     type:'success',
+    //     timestamp: Date.now()
+    // }); 
+    await joplin.commands.execute('editor.execCommand', {
+        name: 'cm-tempFloatingObject',
+        args: [{ text: `LLM ${int_target_llm} selected!`, 
+            floatId: String(2500+(Date.now()%500)), ms: 2000, bgColor: COLOR_FLOAT_SETTING }]
+    });
 }
 
 /**

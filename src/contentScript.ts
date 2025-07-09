@@ -368,54 +368,101 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
             */
             //
             const FLOATING_OBJECT_ID = 'notellm-floating-object';
+            const FLOATING_OBJECT_BG = '#4d53b3'; // 深蓝  // 'rgba(10, 100, 200, 0.9)';
             //
+            function add_floating_object (text: string, floatId:string, bgColor:string = FLOATING_OBJECT_BG) {
+
+                // 1. 检查悬浮对象是否已存在
+                let floatingEl = document.getElementById(floatId);
+
+                // 2. 如果不存在，则创建它
+                if (!floatingEl) {
+                    floatingEl = document.createElement('div');
+                    floatingEl.id = floatId;
+                    
+                    // 关键：使用 position: fixed 来实现窗口级悬浮
+                    floatingEl.style.position = 'fixed';//'absolute';
+                    // floatingEl.style.right = '20%';
+                    // floatingEl.style.left = '20%';
+                    floatingEl.style.right = '-100px';
+                    floatingEl.style.bottom = '60px';
+                    // floatingEl.style.transform = 'translateX(-50%)';
+
+                    // 设置一个较高的 z-index 确保它在 Joplin 其他 UI 之上
+                    floatingEl.style.zIndex = '2048'; 
+                    
+                    // 添加一些样式让它更显眼
+                    floatingEl.style.padding = '10px 80px 10px 40px';
+                    floatingEl.style.boxShadow = '2px 2px 5px rgba(0, 0, 0, 0.2)';
+                    floatingEl.style.opacity = '0.0';
+                    floatingEl.style.backgroundColor = bgColor;
+                    floatingEl.style.color = 'white';
+                    floatingEl.style.borderRadius = '60px';
+                    floatingEl.style.fontFamily = 'sans-serif';
+                    floatingEl.style.fontSize = '14px';
+                    floatingEl.style.transition = 'all 200ms ease';
+                    floatingEl.style.minWidth = '120px';
+                    
+                    // 只用于显示，不允许任何操作交互，避免干扰
+                    floatingEl.style.pointerEvents = 'none';
+                    floatingEl.style.userSelect = 'none';
+                    
+                    // 将其添加到主文档的 body 中，而不是编辑器内部
+                    document.body.appendChild(floatingEl);
+
+                }
+                
+                // 3. 更新其内容
+                floatingEl.textContent = text;
+                setTimeout(() => {
+                    floatingEl.style.opacity = '1';
+                    floatingEl.style.right = '-60px';
+                }, 10);
+            }
             codeMirrorWrapper.registerCommand("cm-addFloatingObject", 
-                (payload: { text: string }) => {
-                    const { text } = payload;
-
-                    // 1. 检查悬浮对象是否已存在
-                    let floatingEl = document.getElementById(FLOATING_OBJECT_ID);
-
-                    // 2. 如果不存在，则创建它
-                    if (!floatingEl) {
-                        floatingEl = document.createElement('div');
-                        floatingEl.id = FLOATING_OBJECT_ID;
-                        
-                        // 关键：使用 position: fixed 来实现窗口级悬浮
-                        floatingEl.style.position = 'absolute';//'fixed';
-                        // floatingEl.style.right = '20%';
-                        // floatingEl.style.left = '20%';
-                        floatingEl.style.right = '20px';
-                        floatingEl.style.bottom = '20px';
-                        // floatingEl.style.transform = 'translateX(-50%)';
-
-                        // 设置一个较高的 z-index 确保它在 Joplin 其他 UI 之上
-                        floatingEl.style.zIndex = '2048'; 
-                        
-                        // 添加一些样式让它更显眼
-                        floatingEl.style.padding = '10px 15px';
-                        floatingEl.style.boxShadow = '2px 2px 5px rgba(0, 0, 0, 0.2)';
-                        floatingEl.style.backgroundColor = 'rgba(10, 100, 200, 0.9)';
-                        floatingEl.style.color = 'white';
-                        floatingEl.style.borderRadius = '8px';
-                        floatingEl.style.fontFamily = 'sans-serif';
-                        floatingEl.style.fontSize = '14px';
-                        
-                        // 将其添加到主文档的 body 中，而不是编辑器内部
-                        document.body.appendChild(floatingEl);
-                    }
-
-                    // 3. 更新其内容
-                    floatingEl.textContent = text;
+                (payload: { text: string, floatId:string, bgColor?:string }) => {
+                    let { text, floatId, bgColor=FLOATING_OBJECT_BG } = payload;
+                    add_floating_object( text, floatId, bgColor);
             });
-
-            codeMirrorWrapper.registerCommand("cm-removeFloatingObject", 
-                () => {
-                    const floatingEl = document.getElementById(FLOATING_OBJECT_ID);
-                    if (floatingEl) {
+            //
+            function remove_floating_object (floatId:string) {
+                const floatingEl = document.getElementById(floatId);
+                if (floatingEl) {
+                    floatingEl.style.opacity = '0';
+                    floatingEl.style.right = '-100px';
+                    setTimeout(() => {
                         floatingEl.remove();
-                    }
+                    }, 500);
+                    // floatingEl.remove();
+                }
+            }
+            codeMirrorWrapper.registerCommand("cm-removeFloatingObject", (floatId:string = FLOATING_OBJECT_ID) => {
+                remove_floating_object(floatId);
+            });
+            //
+            /*
+            临时出现，之后消失，可用于 toast。
+            用法：
+            await joplin.commands.execute('editor.execCommand', {
+                name: 'cm-tempFloatingObject',
+                args: [{ text: `Hello world`, floatId:'test1', ms:3000 }]
+            });
+            */
+            function temp_floating_object( text: string, floatId:string, 
+                bgColor:string = FLOATING_OBJECT_BG, ms: number = 2000){
+                    //
+                    add_floating_object(text, floatId, bgColor);
+                    //
+                    setTimeout(() =>{
+                        remove_floating_object(floatId);
+                    }, ms);
+            }
+            codeMirrorWrapper.registerCommand("cm-tempFloatingObject", 
+                (payload: { text: string, floatId:string, bgColor?:string, ms?:number }) => {
+                    let { text, floatId, bgColor = FLOATING_OBJECT_BG, ms = 3000 } = payload;
+                    temp_floating_object( text, floatId, bgColor, ms);
             });
         },
     };
 };
+//
