@@ -1,7 +1,5 @@
-console.info('>>> [LineWidget] contentScript.ts SCRIPT HAS BEEN LOADED AND IS EXECUTING <<<');
-
 // import joplin from 'api';
-import { lineNumbers  } from "@codemirror/view";
+// import { lineNumbers  } from "@codemirror/view";
 import { EditorView, DecorationSet, Decoration, WidgetType } from "@codemirror/view";
 import { StateField, StateEffect  } from "@codemirror/state";
 // import {llmReplyStream} from './my_utils';
@@ -186,7 +184,7 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
             // ====== TEST ===== ======== =========== === ========= ======== 
             //            
             /**
-             * 悬浮控件
+             * 单行控件
              */
             // 1. 定义要插入的 Widget 的类
             class LineWidget extends WidgetType {
@@ -355,7 +353,7 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
             // codeMirrorWrapper.addExtension(lineNumbers());
             //
             // ================= ================ ==================
-            // 测试悬浮物体
+            // 悬浮控件，用于显示提示内容
             /*
             用法：
             await joplin.commands.execute('editor.execCommand', {
@@ -413,7 +411,8 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                 }
                 
                 // 3. 更新其内容
-                floatingEl.textContent = text;
+                // floatingEl.textContent = text;  // 纯文本
+                floatingEl.innerHTML = text;  // 兼容 html 元素
                 setTimeout(() => {
                     floatingEl.style.opacity = '1';
                     floatingEl.style.right = '-60px';
@@ -437,7 +436,9 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                 }
             }
             codeMirrorWrapper.registerCommand("cm-removeFloatingObject", (floatId:string = FLOATING_OBJECT_ID) => {
-                remove_floating_object(floatId);
+                setTimeout(() =>{
+                        remove_floating_object(floatId);
+                }, 200);  // 为了避免出现瞬间就消失
             });
             //
             /*

@@ -247,6 +247,126 @@ class TextProgressAnimator {
         }
     }
 }
+/**
+ * 用自定义悬浮体实现的进度显示
+ */
+class FloatProgressAnimator {
+    // 1. 在顶部声明所有类属性及其类型
+    private animation_uuid: string | null;
+    private animation_progress_str: string;  // 显示进度的 html 文本
+    private is_running: boolean;  // 运行状态
+    //
+    // 这些属性可以在构造时传入，设为 public
+    public animation_interval: number;  // 暂时没用
+    public is_enabled: boolean;  // 这个数来自设置文件，但最好传参获取
+    public bg_color:string;
+    //
+    constructor(animation_uuid: string = 'notellm_animation', is_enabled: boolean = true, anim_text: string = '', bg_color:string = '#4d53b3') {
+        // 在构造函数中初始化属性
+        this.is_enabled = is_enabled;
+        this.bg_color = bg_color;
+        //
+        // 初始化其他内部状态
+        this.animation_uuid = animation_uuid;
+        this.animation_progress_str = anim_text;
+        this.is_running = false;
+        if (this.animation_progress_str.trim().length < 1) {
+            this.animation_progress_str = `
+                <div class="scoped-bouncing-loader">
+                <!-- CSS样式和动画定义 -->
+                <style>
+                    .scoped-bouncing-loader {
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        width: 100%;
+                        min-height: 30px;
+                    }
+                    .scoped-bouncing-loader .ball {
+                        width: 8px;
+                        height: 8px;
+                        margin: 0 8px;
+                        background-color: #ffffff; /* 您可以修改这个颜色 */
+                        border-radius: 50%;
+                        animation: scoped-bounce 0.6s infinite alternate;
+                    }
+                    /* 为第二个和第三个小球设置动画延迟 */
+                    .scoped-bouncing-loader .ball:nth-child(2) {
+                        animation-delay: 0.2s;
+                    }
+                    .scoped-bouncing-loader .ball:nth-child(3) {
+                        animation-delay: 0.4s;
+                    }
+
+                    /* 定义跳动动画 */
+                    @keyframes scoped-bounce {
+                        from {
+                            transform: translateY(10px);
+                        }
+                        to {
+                            transform: translateY(-10px);
+                        }
+                    }
+                </style>
+
+                <!-- 实现动画的HTML元素 -->
+                <div class="ball"></div>
+                <div class="ball"></div>
+                <div class="ball"></div>
+                </div>`
+        }
+    }
+    /**
+     * 启动等待动画 (公共方法)
+     * @param note_id - 当前笔记的 ID
+     */
+    public async start(): Promise<void> {
+        if (this.is_running || !this.is_enabled) {
+            return;
+        }
+        //
+        try {
+            //
+            this.is_running = true;
+            //
+            await joplin.commands.execute('editor.execCommand', {
+                name: 'cm-addFloatingObject',
+                args: [{ text: this.animation_progress_str, floatId: this.animation_uuid, bgColor: this.bg_color }]
+            });
+            console.log(this.animation_uuid);
+        }
+        catch {
+            this.stop();
+            this.is_running = false;
+            return;
+        }
+    }
+
+    /**
+     * 停止等待动画 (公共方法)
+     * @param clear_float - 是否需要清除编辑器中的等待文本
+     */
+    public async stop(clear_float: boolean = true): Promise<void> {
+        //
+        await joplin.commands.execute('editor.execCommand', {
+            name: 'cm-removeFloatingObject',
+            args: [this.animation_uuid]
+        });
+        // if (!this.is_running) {
+        //     return;
+        // }
+        // if (clear_float) {
+        //     await joplin.commands.execute('editor.execCommand', {
+        //         name: 'cm-removeFloatingObject',
+        //         args: [{floatId: this.animation_uuid}]
+        //     });
+        // }
+        //
+        this.is_running = false;
+        //
+    }
+}
+//
 //
 /**
  * 流式回复的可调用函数
@@ -256,7 +376,7 @@ class TextProgressAnimator {
 export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     is_selection_exists=true, str_before='', str_after=''}) {
     //
-    const head_tail_n_cnt = 1
+    const HEAD_TAIL_N_CNT = 1  // count of '\n'
     const locale = await joplin.settings.globalValue('locale');
     let dictText = getTxt(locale);
     //
@@ -318,8 +438,8 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     // 
     let prompt_for_chat = String(llmSettingValues['llmChatPrompt']);
     //
-    const chat_head = `Response from ${apiModel}:`;  // 不需要加粗
-    const chat_tail = '**End of response**';
+    const CHAT_HEAD = `Response from ${apiModel}:`;  // 不需要加粗
+    const CHAT_TAIL = '**End of response**';
     //
     // 文字动效参数
     const ANIMATION_INTERVAL_MS = 120;
@@ -334,8 +454,8 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     };
     // 光标移动到选区最末尾
     await joplin.commands.execute('editor.execCommand', {name: 'cm-moveCursorToSelectionEnd'});
-    // 打印 chat_head
-    await insertContentToNote(`\n\n**${chat_head}**`+'\n'.repeat(head_tail_n_cnt));
+    // 打印 CHAT_HEAD
+    await insertContentToNote(`\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_N_CNT));
     // 滚动条移动到光标位置
     await scroll_to_view(platform);
     // 
@@ -371,14 +491,172 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     }
     //
     // waiting 动效
-    //
+    const WAITING_HTML = `
+        <div class="scoped-progress-bar-wrapper">
+        <!-- CSS样式和动画定义 -->
+        <style>
+            .scoped-progress-bar-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            padding: 10px 0; /* 增加一些内边距，方便展示 */
+            }
+            .scoped-progress-bar-wrapper .progress-container {
+            width: 80%;
+            max-width: 300px;
+            height: 10px;
+            background-color: #ffffff;
+            border-radius: 5px;
+            overflow: hidden;
+            }
+            .scoped-progress-bar-wrapper .progress-bar {
+            width: 100%;
+            height: 100%;
+            background-size: 200% 100%;
+            background-image: linear-gradient(
+                to right,
+                #BBBBBB 50%, /* 您可以修改这个颜色 */
+                transparent 50%
+            );
+            animation: scoped-move-progress 1.5s linear infinite;
+            }
+
+            /* 定义进度条移动动画 */
+            @keyframes scoped-move-progress {
+            from {
+                background-position: 100% 0;
+            }
+            to {
+                background-position: -100% 0;
+            }
+            }
+        </style>
+
+        <!-- 实现动画的HTML元素 -->
+        <div class="progress-container">
+            <div class="progress-bar"></div>
+        </div>
+        </div>
+    `
     const show_waiting = Number(llmSettingValues['llmWaitAnimation']) === 1;
-    const waitingAnimator = new TextProgressAnimator(ANIMATION_INTERVAL_MS, show_waiting, 'Waiting'); 
-    try {
+    // const waitingAnimator = new TextProgressAnimator(ANIMATION_INTERVAL_MS, show_waiting, 'Waiting'); 
+    const waitingAnimator = new FloatProgressAnimator('notellm_waiting_anim', show_waiting, WAITING_HTML); 
+    //
+    // think part
+    const THINKING_HTML = `
+        <div class="scoped-thinking-loader">
+        <!-- 内部CSS样式和动画定义 -->
+        <style>
+            /* 
+            * 所有样式都封装在 .scoped-thinking-loader 内部，以避免全局样式冲突。
+            */
+            .scoped-thinking-loader {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            min-height: 30px; /* 确保有足够的高度来展示动画 */
+            font-family: 'Arial', sans-serif; /* 您可以更换成您喜欢的字体 */
+            font-size: 1rem; /* 字体大小 */
+            color: #FFFFFF; /* 字体颜色 */
+            }
+
+            /* 每个字母的容器 */
+            .scoped-thinking-loader .letter-container {
+            display: flex;
+            }
+
+            /* 应用于每个字母的动画 */
+            .scoped-thinking-loader .letter {
+            /* 
+            * 动画名称: scoped-letter-bounce
+            * 持续时间: 1.4s
+            * 速度曲线: ease-in-out (慢-快-慢，效果更自然)
+            * 循环次数: infinite (无限循环)
+            */
+            animation: scoped-letter-bounce 2.5s linear infinite;
+            }
+
+            /* 
+            * 使用 :nth-child 选择器为每个字母设置不同的动画延迟（animation-delay）
+            * 这是实现“不同步”跳动的关键！
+            */
+            .scoped-thinking-loader .letter:nth-child(1) { animation-delay: 0s; }
+            .scoped-thinking-loader .letter:nth-child(2) { animation-delay: 0.2s; }
+            .scoped-thinking-loader .letter:nth-child(3) { animation-delay: 0.4s; }
+            .scoped-thinking-loader .letter:nth-child(4) { animation-delay: 0.6s; }
+            .scoped-thinking-loader .letter:nth-child(5) { animation-delay: 0.8s; }
+            .scoped-thinking-loader .letter:nth-child(6) { animation-delay: 1s; }
+            .scoped-thinking-loader .letter:nth-child(7) { animation-delay: 1.2s; }
+            .scoped-thinking-loader .letter:nth-child(8) { animation-delay: 1.4s; }
+            .scoped-thinking-loader .letter:nth-child(9) { animation-delay: 1.6s; }
+            .scoped-thinking-loader .letter:nth-child(10) { animation-delay: 1.8s; }
+            .scoped-thinking-loader .letter:nth-child(11) { animation-delay: 2.0s; }
+
+            /* 
+            * 定义一个唯一的动画名称，避免冲突
+            * 0% -> 50% -> 100% 的关键帧定义了一个完整的“跳起再落下”的动作
+            */
+            @keyframes scoped-letter-bounce {
+            0%, 20%, 100% {
+                transform: translateY(0px);
+            }
+            10% { transform: translateY(-5px);}
+            }
+        </style>
+
+        <!-- HTML结构：将每个字母用 <span> 包裹起来 -->
+        <div class="letter-container">
+            <span class="letter">T</span>
+            <span class="letter">h</span>
+            <span class="letter">i</span>
+            <span class="letter">n</span>
+            <span class="letter">k</span>
+            <span class="letter">i</span>
+            <span class="letter">n</span>
+            <span class="letter">g</span>
+            <span class="letter">.</span><span class="letter">.</span><span class="letter">.</span>
+        </div>
+        </div>`
+    const hide_thinking = Number(llmSettingValues['llmChatSkipThink']) === 1;
+    // const thinkingAnimator = new TextProgressAnimator(ANIMATION_INTERVAL_MS, hide_thinking, 'Thinking'); 
+    const thinkingAnimator = new FloatProgressAnimator('notellm_thinking_anim', hide_thinking, THINKING_HTML, COLOR_FLOAT_NORMAL); 
+    let thinking_status = 'not_started';
+    //
+    // 开始等待
+    async function on_wait_start(){
         await waitingAnimator.start();
     }
-    catch {
+    async function on_wait_end(){
         await waitingAnimator.stop();
+    }
+    // 开始思考
+    async function on_think_start(){
+        await thinkingAnimator.start();
+    }
+    // 思考中
+    async function think_going(){
+    }
+    // 结束思考
+    async function on_think_end(){
+        await thinkingAnimator.stop();
+    }
+    async function on_llm_end(){
+        //
+    }
+    async function on_animation_error() {
+        await on_wait_end();
+        await on_think_end();
+    }
+    //
+    // ============= ================= ==============
+    // 
+    try {
+        await on_wait_start();
+    }
+    catch {
+        await on_wait_end();
     }
     //
     // 构造请求体
@@ -426,9 +704,10 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
             return;
         }
     }
-    catch(err){  // 这里如果出错，最可能的是CORS限制。此时得到的response是空对象。
-        await waitingAnimator.stop();
+    catch(err){  
+        await on_animation_error();
         //
+        // 网络错误，或者CORS限制。此时得到的response是空对象。
         if (err.message.includes('Failed to fetch')){
             console.error('Error 173:', err);
             alert(`Error 173: ${err}. \n ${dictText['err_cors']}`);
@@ -453,54 +732,32 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     let fail_count = 0
     const FAIL_COUNT_MAX = 3
     //
-    // think part
-    const hide_thinking = Number(llmSettingValues['llmChatSkipThink']) === 1;
-    const thinkingAnimator = new TextProgressAnimator(ANIMATION_INTERVAL_MS, hide_thinking, 'Thinking'); 
-    let thinking_status = 'not_started';
-    //
-    // 开始思考
-    async function on_think_start(){
-        await thinkingAnimator.start();
-    }
-    // 思考中
-    async function think_going(){
-    }
-    // 结束思考
-    async function on_think_end(){
-        await thinkingAnimator.stop();
-    }
-    async function on_llm_end(){
-
-    }
-    //
     // 输出解析部分
     //
     try{
         let cur_pos:any;
+        let start_note = await joplin.workspace.selectedNote(); // 启动时的笔记
         //
-        let start_note = await joplin.workspace.selectedNote(); 
         while (true) {
             //
             // 切换笔记后退出
             let current_note = await joplin.workspace.selectedNote();
             if (current_note.id != start_note.id){
                 alert('ERROR: ' + dictText['err_note_changed'])
-                await waitingAnimator.stop();
-                await thinkingAnimator.stop();
+                await on_animation_error();
                 return;  
             }
             // 连续失败后退出
             if (fail_count >= FAIL_COUNT_MAX) {
                 alert(dictText['err_wrong'])                
-                await waitingAnimator.stop();
-                await thinkingAnimator.stop();
+                await on_animation_error();
                 break;  
             }
             //
             const { done, value } = await reader.read();
             if (done) {
-                await waitingAnimator.stop();
-                await thinkingAnimator.stop();
+                await on_wait_end();
+                await on_think_end();
                 break; // 流结束时退出循环
             }
             //
@@ -527,17 +784,15 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
                         const parsed = JSON.parse(jsonString);
                         let new_content = parsed.choices[0]?.delta?.content || '';
                         //
-                        if (new_content.trim().length >0){  // 如果有返回值了；
+                        if (new_content.trim().length >0){  // 如果有返回值了，可以结束等待；
                             // 先停止waiting提示
-                            await waitingAnimator.stop();
+                            await on_wait_end();
                         }
                         //
                         if (thinking_status === 'not_started') {
                             //
                             // only when startswith <think>
-                            if (new_content.trim() === '<think>'){
-                                // // 保险起见，先停一下
-                                await waitingAnimator.stop();  
+                            if (['<think>', '<THINK>'].includes(new_content.trim())){
                                 thinking_status = 'thinking'
                                 // 
                                 // 思考期间的等待可视化
@@ -552,7 +807,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
                             }
                         }
                         else if(thinking_status === 'thinking') {  // 如果已经在思考中了
-                            if (new_content.trim() === '</think>'){  // 结束思考的标志
+                            if (['</think>', '</THINK>'].includes(new_content.trim())){  // 结束思考的标志
                                 thinking_status = 'think_ends';
                                 await on_think_end();
                             }
@@ -567,7 +822,8 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
                                 }
                             }
                             else if (new_content.trim().length > 0){
-                                thinking_status = 'think_finished'
+                                thinking_status = 'think_finished';
+                                await on_think_end();
                                 if (hide_thinking){
                                     new_content = new_content.trim();
                                 }
@@ -592,9 +848,9 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
                                 await insertContentToNote(output_str);
                                 need_add_head = false;
                             }
-                            else if(output_str.length>(5 + `**${chat_head}**`.length) ){
-                                if(output_str.trim().startsWith(`**${chat_head}**`)){  // 
-                                    output_str = output_str.replace(`**${chat_head}**`,''); // 避免重复出现
+                            else if(output_str.length>(5 + `**${CHAT_HEAD}**`.length) ){
+                                if(output_str.trim().startsWith(`**${CHAT_HEAD}**`)){  // 
+                                    output_str = output_str.replace(`**${CHAT_HEAD}**`,''); // 避免重复出现
                                     await insertContentToNote(output_str);
                                 }
                                 else{
@@ -630,24 +886,26 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
             else{
                 console.info('Chunk is not string: ', chunk);
             }
-        }
+        }  // 结束 while 循环
         //
-        // 收尾工作
+        // 大模型回复完成，执行收尾工作
         try{
             // 万一总长度不足导致上面没有执行；
             if (need_add_head){ 
                 await insertContentToNote(output_str);
             }
             // 防止大模型抽风，重复输出手动设定的结束语。
-            if (output_str.trim().endsWith(chat_tail)){  
+            if (output_str.trim().endsWith(CHAT_TAIL)){  
                 await insertContentToNote('\n\n');
             }
             else{  // 正常情况，由程序输出结束语
-                await insertContentToNote('\n'.repeat(head_tail_n_cnt) + `${chat_tail}\n\n`);
+                await insertContentToNote('\n'.repeat(HEAD_TAIL_N_CNT) + `${CHAT_TAIL}\n\n`);
             }
             //
             await scroll_to_view(platform);
+            //
             // 显示完成提示
+            //
             // await (joplin.views.dialogs as any).showToast({
             //     message:'Finished.', 
             //     duration:2500+(Date.now()%500), 
@@ -660,25 +918,26 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
             });
         }
         catch(err){
-            console.error('ERR501_in_utils.ts: ',err);
+            console.error('ERR501_in_utils.ts: ', err);
         }
     }
+    // 如果输出解析失败的话
     catch(err){
-        console.error('ERR531_in_utils.ts: ',err);
+        console.error('ERR531_in_utils.ts: ', err);
     }
-    finally{
-        try{
-            await waitingAnimator.stop();
+    // 不管成功还是失败，都要执行的收尾工作
+    finally {
+        try {
+            await on_wait_end();
         }
-        catch(err){
+        catch (err) {
             //
         }
         //
-        try{
-            
-            await thinkingAnimator.stop();
+        try {
+            await on_think_end();
         }
-        catch{
+        catch {
             //
         }
     }
@@ -707,6 +966,8 @@ export async function changeLLM(llm_no=0) {
         }
     }
     console.log(int_target_llm);
+    //
+    // toast for LLM changing
     //
     await joplin.settings.setValue('llmSelect', int_target_llm);
     // await (joplin.views.dialogs as any).showToast({
