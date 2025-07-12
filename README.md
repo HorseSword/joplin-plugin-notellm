@@ -76,6 +76,7 @@ And, in the top menu under Tools / NoteLLM, find quick access to all functions. 
 
 # Update Logs
 
+- v0.5.2, 2025-07-12. Optimized waiting and thinking animation effects.
 - v0.5.1, 2025-07-09. (1) Optimized lots of animation effects. (2) New toast (removed old toast because of it's bug).
 - v0.5.0, 2025-07-08. Significantly adjusted the waiting animation, and optimized the code logic.
 - v0.4.16, 2025-07-06. Small bug fixed.
