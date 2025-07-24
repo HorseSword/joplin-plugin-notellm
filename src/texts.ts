@@ -9,10 +9,10 @@ export function getTxt(lan='en') {
     dictText['toast_succeed'] = isZH?'回复完毕！':'Response finished.';
     dictText['toast_LLM'] = isZH?'已启用':'selected.'; // 前面有 LLM n 字眼。
     //
-    dictText['summary_label'] = isZH?'生成摘要（基于光标以上，有选中时对选中区域）':'Summarize selection (or above cursor)'
-    dictText['chat_label'] = isZH?'聊天（基于光标前文，有选中时对选中区域）':'Chat and reply (above cursor)';
-    dictText['ask_label'] = isZH?'提问（针对选中区域）':'Ask about selection'
-    dictText['improve_label'] = isZH?'改写（结合上下文改写选中区域）':'Improve selection (context related)'
+    dictText['summary_label'] = isZH?'生成摘要（无选中时基于光标前文，有选中时基于选中区域）':'Summarize (above cursor or selection)'
+    dictText['chat_label'] = isZH?'聊天（无选中时基于光标前文，有选中时基于选中区域）':'Chat (above cursor or selection)';
+    dictText['ask_label'] = isZH?'提问选中区域':'Ask about selection'
+    dictText['improve_label'] = isZH?'改写选中区域（结合上下文）':'Rewrite selection (based on before and after)'
     //
     // settings
     dictText['select_llm_label']= isZH?'选择 LLM':'LLM select'

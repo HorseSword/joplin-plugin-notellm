@@ -247,7 +247,22 @@ export async function registerSettings(): Promise<void> {
         section: 'notellm.settings',
         public: true,
         advanced: true,
-      }
+      },
+      // animation for waiting
+      llmMcp: { 
+        type: SettingItemType.Int,
+        value: 0,
+        label: 'MCP', 
+        description: 'Turn ON to use MCP.', 
+        section: 'notellm.settings',
+        public: true,
+        advanced: false,
+        isEnum: true,
+        options: {
+          1: 'ON',
+          0: 'OFF',
+        }
+      },
     });
 }
 

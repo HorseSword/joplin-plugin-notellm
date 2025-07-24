@@ -373,15 +373,23 @@ class FloatProgressAnimator {
  * 
  * 这个函数的作用是，根据传入的文本，流式返回结果。
  */
-export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
-    is_selection_exists=true, str_before='', str_after=''}) {
+export async function llmReplyStream({
+        inp_str, 
+        lst_msg = [], 
+        query_type='chat',
+        is_selection_exists=true, 
+        str_before='', 
+        str_after='',
+        lst_tools_input = [],
+        round_tool_call = 0
+    }) {
     //
-    const HEAD_TAIL_N_CNT = 1  // count of '\n'
     const locale = await joplin.settings.globalValue('locale');
     let dictText = getTxt(locale);
     //
-    console.log(inp_str);
-    console.log(lst_msg);
+    console.log('inp_str = ', inp_str);
+    console.log('lst_msg = ', lst_msg);
+    console.log('lst_tools_input = ', lst_tools_input);
     // ===============================================================
     // 读取设置的参数
     const llmSettingValues = await joplin.settings.values([
@@ -391,13 +399,13 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         'llmSelect',
         'llmTemperature','llmMaxTokens','llmScrollType',
         'llmChatType','llmChatSkipThink', 'llmWaitAnimation',
-        'llmChatPrompt'
+        'llmChatPrompt','llmMcp'
     ]);
     // 基础参数
     let llmSelect = llmSettingValues['llmSelect'];
     llmSelect = parseInt(String(llmSelect));
     //
-    let apiModel = '', apiUrl = '', apiKey = '', extraConfig;
+    let apiModel = '', apiUrl = '', apiKey = '', extraConfig:any;
     if(llmSelect==2){
         apiModel = String(llmSettingValues['llmModel2']);
         apiUrl = String(llmSettingValues['llmServerUrl2']) + '/chat/completions';
@@ -432,14 +440,34 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     llmScrollType = parseInt(String(llmScrollType)) ;
     //
     let platform = 'desktop';
-    if (llmScrollType==1){platform = 'desktop'}
-    else if (llmScrollType==2){platform = 'mobile'}
-    else{platform = 'none'}
+    if (llmScrollType==1) {
+        platform = 'desktop'
+    }
+    else if (llmScrollType==2) {
+        platform = 'mobile'
+    }
+    else {
+        platform = 'none'
+    }
     // 
     let prompt_for_chat = String(llmSettingValues['llmChatPrompt']);
     //
+    // MCP
+    const IS_MCP_ENABLED = Number(llmSettingValues['llmMcp']) === 1;
+    const MCP_SERVER = 'http://127.0.0.1:38081';
+    const MAX_TOOL_CALL_ROUND = 5 // 不允许 MCP 的循环调用次数过多
+    //
+    // head and tail
+    const HEAD_TAIL_N_CNT = 1  
     const CHAT_HEAD = `Response from ${apiModel}:`;  // 不需要加粗
     const CHAT_TAIL = '**End of response**';
+    // 打印 CHAT_HEAD
+    const print_head = async () => {
+        await insertContentToNote(`\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_N_CNT));
+    }
+    const print_tail = async () => {
+        await insertContentToNote('\n'.repeat(HEAD_TAIL_N_CNT) + `${CHAT_TAIL}\n\n`);
+    }
     //
     // 文字动效参数
     const ANIMATION_INTERVAL_MS = 120;
@@ -447,15 +475,14 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     // ===============================================================
     // 实时更新笔记中的回复
     // 
-    let result = ''
+    let result_whole = ''
     const insertContentToNote = async (new_text: string) => {
-        result += new_text; // 将新内容拼接到结果中
+        result_whole += new_text; // 将新内容拼接到结果中
         await joplin.commands.execute('insertText', new_text); // 插入最新内容到笔记
     };
+    //
     // 光标移动到选区最末尾
     await joplin.commands.execute('editor.execCommand', {name: 'cm-moveCursorToSelectionEnd'});
-    // 打印 CHAT_HEAD
-    await insertContentToNote(`\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_N_CNT));
     // 滚动条移动到光标位置
     await scroll_to_view(platform);
     // 
@@ -543,7 +570,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     // const waitingAnimator = new TextProgressAnimator(ANIMATION_INTERVAL_MS, show_waiting, 'Waiting'); 
     const waitingAnimator = new FloatProgressAnimator('notellm_waiting_anim', show_waiting, WAITING_HTML); 
     //
-    // think part
+    // think 动效
     const THINKING_HTML = `
         <div class="scoped-thinking-loader">
         <!-- 内部CSS样式和动画定义 -->
@@ -628,9 +655,11 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     async function on_wait_start(){
         await waitingAnimator.start();
     }
+    // 等待结束
     async function on_wait_end(){
         await waitingAnimator.stop();
     }
+    //
     // 开始思考
     async function on_think_start(){
         await thinkingAnimator.start();
@@ -651,8 +680,10 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     }
     //
     // ============= ================= ==============
+    // 主要流程开始
     // 
     try {
+        // 进入之后，立刻开始 wait 环节；
         await on_wait_start();
     }
     catch {
@@ -667,6 +698,34 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         temperature: apiTemperature,
         max_tokens: apiMaxTokens,
     };
+    //
+    // 工具 MCP
+    //
+    if (IS_MCP_ENABLED && round_tool_call <= MAX_TOOL_CALL_ROUND) {  
+        if (lst_tools_input.length>0){ // 手动指定，不再获取
+            requestBody['tools'] = lst_tools_input;
+        }
+        else {
+            let openai_tools = await fetch(MCP_SERVER + '/mcp/get_tools')
+                .then(mcp_response => {
+                    if (!mcp_response.ok) {
+                    throw new Error('MCP_网络响应失败');
+                    }
+                    return mcp_response.json(); // 如果返回的是 JSON 数据
+                })
+                .then(data => {
+                    console.log('MCP_获取到的数据:', data); // 处理返回的数据
+                    return data;
+                })
+                .catch(error => {
+                    console.error('MCP_请求失败:', error);
+                });
+            if (openai_tools['tools'].length>0) {  // 还需要更多的格式验证
+                requestBody['tools'] = openai_tools['tools'];
+            }
+        }
+    }
+    //
     // 根据自定义设置，覆盖修改现有的配置项
     try{
         if(extraConfig.trim().length>0){
@@ -679,8 +738,22 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         console.warn('JSON parse failed:', err);
     }
     //
+    // 光标位置
+    let cur_pos:any;  
+    const get_cursor_pos = async () => {
+        let tmp_cur = await joplin.commands.execute('editor.execCommand', {
+            name: 'cm-getCursorPos' 
+        });
+        return tmp_cur;
+    }
+    try{
+        cur_pos = await get_cursor_pos();
+    }
+    catch(err){
+        console.warn('cm-getCursorPos:', err);
+    }
     // 发起 HTTP 请求
-    let response:any;
+    let llm_response:any;
     try{
         let dict_headers = {
             'Content-Type': 'application/json',
@@ -691,16 +764,16 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
             dict_headers['anthropic-dangerous-direct-browser-access'] = 'true';
         }
         //
-        response = await fetch(apiUrl, {
+        llm_response = await fetch(apiUrl, {
             method: 'POST',
             headers: dict_headers,
             body: JSON.stringify(requestBody), // 将请求体序列化为 JSON
         });
         // 检查 HTTP 响应状态
-        if (!response.ok || !response.body) {
-            const errorText = await response.text();
+        if (!llm_response.ok || !llm_response.body) {
+            const errorText = await llm_response.text();
             console.error('Error from LLM API:', errorText);
-            alert(`ERROR 156: ${response.status} ${response.statusText}`);
+            alert(`ERROR 156: ${llm_response.status} ${llm_response.statusText}`);
             return;
         }
     }
@@ -714,7 +787,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
         }
         else{
             console.error('Error 177:',err);
-            alert(`ERROR 177: ${err} \n response = ${response}.`);
+            alert(`ERROR 177: ${err} \n llm_response = ${llm_response}.`);
         }
         return;
     }   
@@ -723,7 +796,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     }
     //
     // 解析流式响应
-    const reader = response.body.getReader();
+    const reader = llm_response.body.getReader();
     const decoder = new TextDecoder('utf-8');
     //
     // 逐块读取流式数据
@@ -732,13 +805,17 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
     let fail_count = 0
     const FAIL_COUNT_MAX = 3
     //
+    let res_type = 'unknown';  // 本次请求的类型划分
+    //
+    let is_stream_done = false;
+    let lst_tool_calls = [];
+    //
     // 输出解析部分
     //
     try{
-        let cur_pos:any;
         let start_note = await joplin.workspace.selectedNote(); // 启动时的笔记
         //
-        while (true) {
+        while (!is_stream_done) {
             //
             // 切换笔记后退出
             let current_note = await joplin.workspace.selectedNote();
@@ -756,6 +833,7 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
             //
             const { done, value } = await reader.read();
             if (done) {
+                is_stream_done = true;
                 await on_wait_end();
                 await on_think_end();
                 break; // 流结束时退出循环
@@ -763,11 +841,20 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
             //
             // 解码并解析数据块
             const chunk:string = decoder.decode(value, { stream: true });
-            // console.info('Stream Chunk:', chunk);
+            console.info('Stream Chunk = ', chunk);
+            //
             // 解析 JSON 行
-            if (typeof chunk === "string"){  // 块作为整理，可能有多行
-                for (const line of chunk.split('\n')) { // 逐行拆解
-                    const trimmedLine = line.trim();
+            if (typeof chunk === "string"){  // 块作为整体，因为一次可能收到多行，每行都是 data: 开头，或者纯空行
+                //
+                // 只要有反馈了，就可以停止waiting提示
+                await on_wait_end();
+                //
+                for (const data_line of chunk.split('\n')) { // 逐行拆解。
+                    // 理论上讲，这里拆解并不会将 json 中间断开，因为换行符都被转义了
+                    // 所以拆出来的全都是完整的 data: 行
+                    // 但考虑到网络传输，可能会有 data: 被中间切断，所以最稳的方法是 buffer 缓存。 TODO
+                    console.info(`chunk_line = ${data_line}`)
+                    const trimmedLine = data_line.trim();
                     // 忽略空行或无效行
                     if (!trimmedLine || !trimmedLine.startsWith('data:')) {
                         continue;
@@ -777,108 +864,132 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
                     // 特殊情况：处理流结束的标志 "data: [DONE]"
                     if (jsonString.trim() === '[DONE]') {
                         console.info('Got [DONE]. Stream finished.');
+                        is_stream_done = true;
                         break;
                     }
                     try {
                         // 解析 JSON 数据
                         const parsed = JSON.parse(jsonString);
-                        let new_content = parsed.choices[0]?.delta?.content || '';
                         //
-                        if (new_content.trim().length >0){  // 如果有返回值了，可以结束等待；
-                            // 先停止waiting提示
-                            await on_wait_end();
+                        let new_dalta = parsed.choices[0]?.delta || {};
+                        //
+                        if (res_type == 'unknown'){  // 如果尚未判定类型
+                            if ('tool_calls' in new_dalta){
+                                // 工具调用
+                                res_type = 'tool_calls';
+                            }
+                            else {
+                                // 常规
+                                res_type = 'content';
+                                await print_head();
+                                cur_pos = await get_cursor_pos();
+                            }
                         }
                         //
-                        if (thinking_status === 'not_started') {
+                        if (res_type == 'tool_calls') {  // 如果是工具调用
                             //
-                            // only when startswith <think>
-                            if (['<think>', '<THINK>'].includes(new_content.trim())){
-                                thinking_status = 'thinking'
-                                // 
-                                // 思考期间的等待可视化
-                                if (hide_thinking){
-                                    await on_think_start();
-                                    continue;
-                                }
-                            }
-                            else{
-                                // 如果不是 <think> 开头，说明不是推理模式，直接跳过
-                                thinking_status = 'think_finished';
-                            }
-                        }
-                        else if(thinking_status === 'thinking') {  // 如果已经在思考中了
-                            if (['</think>', '</THINK>'].includes(new_content.trim())){  // 结束思考的标志
-                                thinking_status = 'think_ends';
-                                await on_think_end();
-                            }
-                            if (hide_thinking){
-                                continue;
-                            }
-                        } 
-                        else if (thinking_status === 'think_ends'){
-                            if(new_content.trim() === ''){
-                                if (hide_thinking){
-                                    continue;
-                                }
-                            }
-                            else if (new_content.trim().length > 0){
-                                thinking_status = 'think_finished';
-                                await on_think_end();
-                                if (hide_thinking){
-                                    new_content = new_content.trim();
+                            // 保存发来的内容
+                            if ('tool_calls' in new_dalta){
+                                for (let tc of new_dalta['tool_calls']){
+                                    lst_tool_calls.push(tc);
                                 }
                             }
                         }
-                        //
-                        output_str += new_content;
-                        // 还原光标位置，避免意外移动光标后输入到错误的位置
-                        try{
-                            let last_pos = cur_pos.startLine.from + cur_pos.startPosition.column;
-                            await joplin.commands.execute('editor.execCommand', {
-                                name: 'cm-moveCursorPosition',
-                                args: [last_pos]
-                            });
-                        }
-                        catch{
+                        else if (res_type == 'content') {  // 如果是文本回复
+                            // 处理 content 内容
+                            let new_content = parsed.choices[0]?.delta?.content || '';
                             //
-                        }
-                        //
-                        if(need_add_head){
-                            if (output_str.length>10 && !output_str.trim().startsWith('**')){  // 肯定不是重复出现
-                                await insertContentToNote(output_str);
-                                need_add_head = false;
-                            }
-                            else if(output_str.length>(5 + `**${CHAT_HEAD}**`.length) ){
-                                if(output_str.trim().startsWith(`**${CHAT_HEAD}**`)){  // 
-                                    output_str = output_str.replace(`**${CHAT_HEAD}**`,''); // 避免重复出现
-                                    await insertContentToNote(output_str);
+                            if (thinking_status === 'not_started') {
+                                //
+                                // only when startswith <think>
+                                if (['<think>', '<THINK>'].includes(new_content.trim())){
+                                    thinking_status = 'thinking'
+                                    // 
+                                    // 思考期间的等待可视化
+                                    if (hide_thinking){
+                                        await on_think_start();
+                                        continue;
+                                    }
                                 }
                                 else{
-                                    await insertContentToNote(output_str);
+                                    // 如果不是 <think> 开头，说明不是推理模式，直接跳过
+                                    thinking_status = 'think_finished';
                                 }
-                                need_add_head = false;
                             }
-                            fail_count = 0;
-                        }
-                        else{
-                            await insertContentToNote(new_content); // 实时更新内容
-                        }
-                        // 滚动条移动到光标位置
-                        await scroll_to_view(platform);
-                        //
-                        // 存储光标位置，避免意外移动光标后输入到错误的位置
-                        try{
-                            cur_pos = await joplin.commands.execute('editor.execCommand', {
-                                name: 'cm-getCursorPos' 
-                            });
-                            // console.log('cur_pos = ',cur_pos);
-                        }
-                        catch(err){
-                            console.warn('cm-getCursorPos:', err);
+                            else if(thinking_status === 'thinking') {  // 如果已经在思考中了
+                                if (['</think>', '</THINK>'].includes(new_content.trim())){  // 结束思考的标志
+                                    thinking_status = 'think_ends';
+                                    await on_think_end();
+                                }
+                                if (hide_thinking){
+                                    continue;
+                                }
+                            } 
+                            else if (thinking_status === 'think_ends'){
+                                if(new_content.trim() === ''){
+                                    if (hide_thinking){
+                                        continue;
+                                    }
+                                }
+                                else if (new_content.trim().length > 0){
+                                    thinking_status = 'think_finished';
+                                    await on_think_end();
+                                    if (hide_thinking){
+                                        new_content = new_content.trim();
+                                    }
+                                }
+                            }
+                            //
+                            output_str += new_content;
+                            // 还原光标位置，避免意外移动光标后输入到错误的位置
+                            try{
+                                let last_pos = cur_pos.startLine.from + cur_pos.startPosition.column;
+                                await joplin.commands.execute('editor.execCommand', {
+                                    name: 'cm-moveCursorPosition',
+                                    args: [last_pos]
+                                });
+                            }
+                            catch{
+                                //
+                            }
+                            //
+                            // 避免大模型又输出一次 head。这个逻辑比较落后，之后可以考虑删除
+                            if(need_add_head){
+                                if (output_str.length>10 && !output_str.trim().startsWith('**')){  // 肯定不是重复出现
+                                    await insertContentToNote(output_str);
+                                    need_add_head = false;
+                                }
+                                else if(output_str.length>(5 + `**${CHAT_HEAD}**`.length) ){
+                                    if(output_str.trim().startsWith(`**${CHAT_HEAD}**`)){  // 
+                                        output_str = output_str.replace(`**${CHAT_HEAD}**`,''); // 避免重复出现
+                                        await insertContentToNote(output_str);
+                                    }
+                                    else{
+                                        await insertContentToNote(output_str);
+                                    }
+                                    need_add_head = false;
+                                }
+                                fail_count = 0;
+                            }
+                            else{
+                                await insertContentToNote(new_content); // 实时更新内容
+                            }
+                            // 滚动条移动到光标位置
+                            await scroll_to_view(platform);
+                            //
+                            // 存储光标位置，避免意外移动光标后输入到错误的位置
+                            try{
+                                cur_pos = await joplin.commands.execute('editor.execCommand', {
+                                    name: 'cm-getCursorPos' 
+                                });
+                                // console.log('cur_pos = ',cur_pos);
+                            }
+                            catch(err){
+                                console.warn('cm-getCursorPos:', err);
+                            }
                         }
                     } catch (err) {
                         console.warn('Failed to parse line:', trimmedLine, err);
-                        // alert(`Failed to parse line: ${err}`);
                         fail_count += 1;
                     }
                 }
@@ -886,39 +997,138 @@ export async function llmReplyStream({inp_str, lst_msg = [], query_type='chat',
             else{
                 console.info('Chunk is not string: ', chunk);
             }
-        }  // 结束 while 循环
+        }  // 结束 while 循环，所有chunk接收完毕
         //
         // 大模型回复完成，执行收尾工作
-        try{
-            // 万一总长度不足导致上面没有执行；
-            if (need_add_head){ 
-                await insertContentToNote(output_str);
+        //
+        if (res_type == 'content') { // 文本回复模式
+            try{
+                // 万一总长度不足导致上面没有执行；
+                if (need_add_head){ 
+                    await insertContentToNote(output_str);
+                }
+                // 防止大模型抽风，重复输出手动设定的结束语。
+                if (output_str.trim().endsWith(CHAT_TAIL)){  
+                    await insertContentToNote('\n\n');
+                }
+                else{  // 正常情况，由程序输出结束语
+                    // await insertContentToNote('\n'.repeat(HEAD_TAIL_N_CNT) + `${CHAT_TAIL}\n\n`);
+                    await print_tail();
+                }
+                //
+                await scroll_to_view(platform);
+                //
+                // 显示完成提示
+                await joplin.commands.execute('editor.execCommand', {
+                    name: 'cm-tempFloatingObject',
+                    args: [{ text: `Finished.`, floatId:String(2500+(Date.now()%500)), ms:2000, bgColor: COLOR_FLOAT_FINISH}]
+                });
             }
-            // 防止大模型抽风，重复输出手动设定的结束语。
-            if (output_str.trim().endsWith(CHAT_TAIL)){  
-                await insertContentToNote('\n\n');
+            catch(err){
+                console.error('ERR501_in_utils.ts: ', err);
             }
-            else{  // 正常情况，由程序输出结束语
-                await insertContentToNote('\n'.repeat(HEAD_TAIL_N_CNT) + `${CHAT_TAIL}\n\n`);
-            }
-            //
-            await scroll_to_view(platform);
-            //
-            // 显示完成提示
-            //
-            // await (joplin.views.dialogs as any).showToast({
-            //     message:'Finished.', 
-            //     duration:2500+(Date.now()%500), 
-            //     type:'success',
-            //     timestamp: Date.now()
-            // });
-            await joplin.commands.execute('editor.execCommand', {
-                name: 'cm-tempFloatingObject',
-                args: [{ text: `Finished.`, floatId:String(2500+(Date.now()%500)), ms:2000, bgColor: COLOR_FLOAT_FINISH}]
-            });
         }
-        catch(err){
-            console.error('ERR501_in_utils.ts: ', err);
+        //
+        else if (res_type == 'tool_calls') {  // 工具调用模式
+            //
+            console.log('lst_tool_calls = ', lst_tool_calls);
+            //
+            // 此处 stream 可能得到的是不完整的请求，需要拼接：
+            let toolCallAssemblers = [];
+            for (const toolCallDelta of lst_tool_calls) {
+                const index = toolCallDelta.index;
+
+                // 如果是这个 index 的第一个块，则初始化组装器
+                if (!toolCallAssemblers[index]) {
+                    toolCallAssemblers[index] = { id: "", type: "function", function: { name: "", arguments: "" } };
+                }
+                
+                // 拼接 ID
+                if (toolCallDelta.id) {
+                    toolCallAssemblers[index].id += toolCallDelta.id;
+                }
+                // 拼接函数名
+                if (toolCallDelta.function?.name) {
+                    toolCallAssemblers[index].function.name += toolCallDelta.function.name;
+                }
+                // 拼接参数 (最关键的部分)
+                if (toolCallDelta.function?.arguments) {
+                    toolCallAssemblers[index].function.arguments += toolCallDelta.function.arguments;
+                }
+            }
+            // 拼接完成后
+            console.log('toolCallAssemblers = ', toolCallAssemblers);
+            //
+            // 调用工具，通过 post 请求
+            let lst_tool_result = []
+            let tool_name_cache = '';
+            for (const tool_call_one of toolCallAssemblers) {
+                let tool_result_one:any;
+                let json_body = JSON.stringify({
+                            name: tool_call_one.function.name,
+                            arguments: tool_call_one.function.arguments
+                        })
+                tool_name_cache = tool_call_one.function.name;
+                console.log("json_body =", json_body)
+                try {
+                    const tool_call_response = await fetch(MCP_SERVER + '/mcp/call_tool', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: json_body
+                    });
+
+                    if (!tool_call_response.ok) {
+                        throw new Error('网络响应异常');
+                    }
+
+                    tool_result_one = await tool_call_response.json(); // 将响应结果保存到变量 a
+                    console.log('请求成功:', tool_result_one);
+                    lst_tool_result.push(tool_result_one);
+                } 
+                catch (error) {
+                    console.error('请求失败:', error);
+                }
+            }
+            console.log(`lst_tool_result = ${lst_tool_result}`)  // 正常工作
+            console.log(`lst_tool_result.length = ${lst_tool_result.length}`)  // 正常工作
+            console.log(`Type of lst_tool_result[0] is: ${typeof lst_tool_result[0]}`);
+
+            //
+            // 重新运行获取大模型回复
+            if (tool_name_cache == 'get_tool_groups') {  // 获取工具组内详情
+                let second_list_tool = []
+                try{
+                    // console.log(`lst_tool_result[0] = `,lst_tool_result[0])
+                    // console.log(`lst_tool_result[0]['result'] = `,lst_tool_result[0]['result'])
+                    second_list_tool = JSON.parse(lst_tool_result[0])['result']['tools']
+                }
+                catch(e){
+                    console.log(`lst_tool_result['result'] = `,lst_tool_result['result'])
+                    second_list_tool = lst_tool_result['result']['tools']
+                }
+                await llmReplyStream({
+                    'inp_str' : 'null', 
+                    'lst_msg' : prompt_messages, 
+                    'round_tool_call': round_tool_call + 1,
+                    'lst_tools_input': second_list_tool
+                });
+            }
+            else {  // 普通的工具调用
+                let prompt_messages_with_tool_result = [
+                    ...prompt_messages, 
+                    // {'role':'system','content':`tool_call result: ${JSON.stringify(lst_tool_result)}`}
+                    {'role':'system','content':`tool_call result: ${lst_tool_result}`}
+                ];
+                console.log('prompt_messages_with_tool_result = ', prompt_messages_with_tool_result);
+                //
+                await llmReplyStream({
+                    'inp_str' : 'null', 
+                    'lst_msg' : prompt_messages_with_tool_result, 
+                    'round_tool_call': round_tool_call + 1
+                });
+            }
         }
     }
     // 如果输出解析失败的话
