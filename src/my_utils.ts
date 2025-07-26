@@ -453,7 +453,15 @@ export async function llmReplyStream({
     let prompt_for_chat = String(llmSettingValues['llmChatPrompt']);
     //
     // MCP
-    const IS_MCP_ENABLED = Number(llmSettingValues['llmMcp']) === 1;
+    let MCP_MODE = 'mcp'  // agent, mcp, null
+    let mcp_number = Number(llmSettingValues['llmMcp']);
+    const IS_MCP_ENABLED = mcp_number > 0;
+    if (mcp_number == 1){
+        MCP_MODE = 'mcp'
+    }
+    else if (mcp_number == 2){
+        MCP_MODE = 'agent'
+    }
     const MCP_SERVER = 'http://127.0.0.1:38081';
     const MAX_TOOL_CALL_ROUND = 7 // 不允许 MCP 的循环调用次数过多
     //
@@ -709,7 +717,14 @@ export async function llmReplyStream({
             requestBody['tools'] = lst_tools_input;
         }
         else {  // 通过API获取可用工具的列表
-            let openai_tools = await fetch(MCP_SERVER + '/mcp/get_tools')
+            let MCP_SERVER_URL = '';
+            if (MCP_MODE == 'mcp'){
+                MCP_SERVER_URL = MCP_SERVER + '/mcp/get_tools'
+            }
+            else if (MCP_MODE == 'agent'){
+                MCP_SERVER_URL = MCP_SERVER + '/mcp/get_agents'
+            }
+            let openai_tools = await fetch(MCP_SERVER_URL)
                 .then(mcp_response => {
                     if (!mcp_response.ok) {
                     throw new Error('MCP_网络响应失败');
@@ -1053,44 +1068,49 @@ export async function llmReplyStream({
             console.log('lst_tool_calls = ', lst_tool_calls);
             //
             // 此处 stream 可能得到的是不完整的请求，需要拼接：
-            let toolCallAssemblers = [];
+            let lst_tool_call_quests = [];
             for (const toolCallDelta of lst_tool_calls) {
                 const index = toolCallDelta.index;
 
                 // 如果是这个 index 的第一个块，则初始化组装器
-                if (!toolCallAssemblers[index]) {
-                    toolCallAssemblers[index] = { id: "", type: "function", function: { name: "", arguments: "" } };
+                if (!lst_tool_call_quests[index]) {
+                    lst_tool_call_quests[index] = { id: "", type: "function", function: { name: "", arguments: "" } };
                 }
                 
                 // 拼接 ID
                 if (toolCallDelta.id) {
-                    toolCallAssemblers[index].id += toolCallDelta.id;
+                    lst_tool_call_quests[index].id += toolCallDelta.id;
                 }
                 // 拼接函数名
                 if (toolCallDelta.function?.name) {
-                    toolCallAssemblers[index].function.name += toolCallDelta.function.name;
+                    lst_tool_call_quests[index].function.name += toolCallDelta.function.name;
                 }
                 // 拼接参数 (最关键的部分)
                 if (toolCallDelta.function?.arguments) {
-                    toolCallAssemblers[index].function.arguments += toolCallDelta.function.arguments;
+                    lst_tool_call_quests[index].function.arguments += toolCallDelta.function.arguments;
                 }
             }
             // 拼接完成后
-            console.log('toolCallAssemblers = ', toolCallAssemblers);
+            console.log('lst_tool_call_quests = ', lst_tool_call_quests);
             //
             // 调用工具，通过 post 请求
             let lst_tool_result = []
             let tool_name_cache = '';
-            for (const tool_call_one of toolCallAssemblers) {
+            for (const tool_call_one of lst_tool_call_quests) {
                 let tool_result_one:any;
-                let json_body = JSON.stringify({
-                            name: tool_call_one.function.name,
-                            arguments: tool_call_one.function.arguments
-                        })
                 tool_name_cache = tool_call_one.function.name;
-                console.log("json_body =", json_body)
                 try {
-                    const tool_call_response = await fetch(MCP_SERVER + '/mcp/call_tool', {
+                    let MCP_RUN_URL = '';
+                    let tool_call_name = ''
+                    let json_body:string;
+                    MCP_RUN_URL = MCP_SERVER + '/mcp/call_tool'
+                    tool_call_name = tool_call_one.function.name
+                    json_body = JSON.stringify({
+                        name: tool_call_name,
+                        arguments: tool_call_one.function.arguments
+                    })
+                    console.log("json_body =", json_body)
+                    const tool_call_response = await fetch(MCP_RUN_URL, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -1116,6 +1136,7 @@ export async function llmReplyStream({
 
             //
             // 重新运行获取大模型回复
+            console.log(`tool_name_cache = ${tool_name_cache}`);
             if (tool_name_cache == 'get_tool_groups') {  // get_tool_groups 专用于获取工具组内详情
                 let second_list_tool = []
                 try{
@@ -1143,11 +1164,20 @@ export async function llmReplyStream({
                 ];
                 console.log('prompt_messages_with_tool_result = ', prompt_messages_with_tool_result);
                 //
-                await llmReplyStream({
-                    'inp_str' : 'null', 
-                    'lst_msg' : prompt_messages_with_tool_result, 
-                    'round_tool_call': round_tool_call + 1
-                });
+                if (MCP_MODE == 'agent'){  // agent模式不再重复调用
+                    await llmReplyStream({
+                        'inp_str' : 'null', 
+                        'lst_msg' : prompt_messages_with_tool_result, 
+                        'round_tool_call': MAX_TOOL_CALL_ROUND + 1,
+                    });
+                }
+                else{
+                    await llmReplyStream({
+                        'inp_str' : 'null', 
+                        'lst_msg' : prompt_messages_with_tool_result, 
+                        'round_tool_call': round_tool_call + 1
+                    });
+                }
             }
         }
     }

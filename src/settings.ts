@@ -259,8 +259,9 @@ export async function registerSettings(): Promise<void> {
         advanced: false,
         isEnum: true,
         options: {
-          1: 'ON',
           0: 'OFF',
+          1: 'MCP',
+          2: 'Agent'
         }
       },
     });
