@@ -1,6 +1,7 @@
 import { getCurves } from 'crypto';
 import joplin from '../api';
 import {getTxt} from './texts';
+import { FLOATING_HTML_BASIC, FLOATING_HTML_THINKING, FLOATING_HTML_WAITING } from './pluginFloatingObject';
 
 const COLOR_FLOAT_FINISH = '#3bba9c'  // 绿色
 const COLOR_FLOAT_SETTING = '#535f80'  // 蓝灰提示
@@ -270,50 +271,8 @@ class FloatProgressAnimator {
         this.animation_uuid = animation_uuid;
         this.animation_progress_str = anim_text;
         this.is_running = false;
-        if (this.animation_progress_str.trim().length < 1) {
-            this.animation_progress_str = `
-                <div class="scoped-bouncing-loader">
-                <!-- CSS样式和动画定义 -->
-                <style>
-                    .scoped-bouncing-loader {
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        width: 100%;
-                        min-height: 30px;
-                    }
-                    .scoped-bouncing-loader .ball {
-                        width: 8px;
-                        height: 8px;
-                        margin: 0 8px;
-                        background-color: #ffffff; /* 您可以修改这个颜色 */
-                        border-radius: 50%;
-                        animation: scoped-bounce 0.6s infinite alternate;
-                    }
-                    /* 为第二个和第三个小球设置动画延迟 */
-                    .scoped-bouncing-loader .ball:nth-child(2) {
-                        animation-delay: 0.2s;
-                    }
-                    .scoped-bouncing-loader .ball:nth-child(3) {
-                        animation-delay: 0.4s;
-                    }
-
-                    /* 定义跳动动画 */
-                    @keyframes scoped-bounce {
-                        from {
-                            transform: translateY(10px);
-                        }
-                        to {
-                            transform: translateY(-10px);
-                        }
-                    }
-                </style>
-
-                <!-- 实现动画的HTML元素 -->
-                <div class="ball"></div>
-                <div class="ball"></div>
-                <div class="ball"></div>
-                </div>`
+        if (this.animation_progress_str.trim().length < 1) {  // 如果外部没有定义的话
+            this.animation_progress_str = FLOATING_HTML_BASIC
         }
     }
     /**
@@ -367,6 +326,63 @@ class FloatProgressAnimator {
     }
 }
 //
+/**
+ * 检查服务器状态是否可用
+ * @param {string} url 要检查的服务器地址
+ * @param {number} [timeout=1000] 超时时间，单位为毫秒
+ * @returns {Promise<{status: 'online' | 'offline' | 'timeout' | 'error', message: string}>}
+ */
+async function checkServerStatus(url:string, timeout = 1000) {
+    // AbortController 是实现超时的关键
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    // 设置一个计时器，在超时后中止 fetch 请求
+    const timeoutId = setTimeout(() => {
+        console.log(`请求 ${url} 超时。`);
+        controller.abort();
+    }, timeout);
+
+    try {
+        // 发起 fetch 请求
+        // 我们使用 'HEAD' 方法，因为它只获取响应头，速度最快。
+        // 'no-cors' 模式可以避免一些跨域问题，但请注意下面的“重要提示”。
+        const response = await fetch(url, {
+            method: 'HEAD', // 使用 HEAD 方法，只请求头信息，速度快
+            mode: 'no-cors', // 使用 no-cors 模式来“测试”连通性，即使有跨域限制
+            signal: signal   // 将 AbortSignal 传递给 fetch
+        });
+
+        // 如果请求成功，清除超时计时器
+        clearTimeout(timeoutId);
+
+        // 对于 'no-cors' 模式，我们无法读取 response.status 或 response.ok
+        // 只要请求没有抛出错误，就认为网络层面是可达的。
+        // 这是一个基本的连通性检查。
+        return {
+            status: 'online',
+            message: `服务器 ${url} 在网络上可达。`
+        };
+
+    } catch (err) {
+        // 清除超时计时器，以防万一
+        clearTimeout(timeoutId);
+
+        // 判断错误类型
+        if (err.name === 'AbortError') {
+        return {
+            status: 'timeout',
+            message: `连接服务器 ${url} 超时 (超过 ${timeout}ms)。`
+        };
+        }
+        
+        // 其他网络错误 (例如 DNS 查找失败, 服务器拒绝连接等)
+        return {
+            status: 'offline',
+            message: `无法连接到服务器 ${url}。错误: ${err.message}`
+        };
+    }
+}
 //
 /**
  * 流式回复的可调用函数
@@ -399,7 +415,7 @@ export async function llmReplyStream({
         'llmSelect',
         'llmTemperature','llmMaxTokens','llmScrollType',
         'llmChatType','llmChatSkipThink', 'llmWaitAnimation',
-        'llmChatPrompt','llmMcp'
+        'llmChatPrompt','llmMcp','llmMcpServer'
     ]);
     // 基础参数
     let llmSelect = llmSettingValues['llmSelect'];
@@ -430,14 +446,11 @@ export async function llmReplyStream({
         return;
     }
     // 高级参数
-    let apiTemperature = llmSettingValues['llmTemperature'];
-    apiTemperature = parseFloat(String(apiTemperature));
+    let apiTemperature = parseFloat(String(llmSettingValues['llmTemperature']));
     //
-    let apiMaxTokens = llmSettingValues['llmMaxTokens']
-    apiMaxTokens = parseInt(String(apiMaxTokens)) ;
+    let apiMaxTokens = parseInt(String(llmSettingValues['llmMaxTokens'])) ;
     //
-    let llmScrollType = llmSettingValues['llmScrollType']
-    llmScrollType = parseInt(String(llmScrollType)) ;
+    let llmScrollType = parseInt(String(llmSettingValues['llmScrollType'])) ;
     //
     let scroll_type = 'desktop';
     if (llmScrollType==1) {
@@ -452,17 +465,18 @@ export async function llmReplyStream({
     // 
     let prompt_for_chat = String(llmSettingValues['llmChatPrompt']);
     //
-    // MCP
-    let MCP_MODE = 'mcp'  // agent, mcp, null
+    // MCP 相关的参数
     let mcp_number = Number(llmSettingValues['llmMcp']);
-    const IS_MCP_ENABLED = mcp_number > 0;
+    const MCP_SERVER = String(llmSettingValues['llmMcpServer']);
+    let IS_MCP_ENABLED = (mcp_number > 0 && MCP_SERVER.trim().length > 0);
+    let MCP_MODE = 'mcp'  // agent, mcp, null
     if (mcp_number == 1){
         MCP_MODE = 'mcp'
     }
     else if (mcp_number == 2){
         MCP_MODE = 'agent'
     }
-    const MCP_SERVER = 'http://127.0.0.1:38081';
+    
     const MAX_TOOL_CALL_ROUND = 7 // 不允许 MCP 的循环调用次数过多
     //
     // head and tail
@@ -484,7 +498,11 @@ export async function llmReplyStream({
     // 实时更新笔记中的回复
     // 
     let result_whole = ''
-    const insertContentToNote = async (new_text: string) => {
+    // const insertContentToNote = async (new_text: string) => {
+    //     result_whole += new_text; // 将新内容拼接到结果中
+    //     await joplin.commands.execute('insertText', new_text); // 插入最新内容到笔记
+    // };
+    async function insertContentToNote (new_text: string) {
         result_whole += new_text; // 将新内容拼接到结果中
         await joplin.commands.execute('insertText', new_text); // 插入最新内容到笔记
     };
@@ -494,6 +512,7 @@ export async function llmReplyStream({
     // 滚动条移动到光标位置
     await scroll_to_view(scroll_type);
     // 
+    // ===============================================================
     // 构造对话列表
     let prompt_messages = [];
     // 如果有传入的，直接使用
@@ -525,138 +544,16 @@ export async function llmReplyStream({
         }
     }
     //
+    // ===============================================================
     // waiting 动效
-    const WAITING_HTML = `
-        <div class="scoped-progress-bar-wrapper">
-        <!-- CSS样式和动画定义 -->
-        <style>
-            .scoped-progress-bar-wrapper {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            padding: 10px 0; /* 增加一些内边距，方便展示 */
-            }
-            .scoped-progress-bar-wrapper .progress-container {
-            width: 80%;
-            max-width: 300px;
-            height: 10px;
-            background-color: #ffffff;
-            border-radius: 5px;
-            overflow: hidden;
-            }
-            .scoped-progress-bar-wrapper .progress-bar {
-            width: 100%;
-            height: 100%;
-            background-size: 200% 100%;
-            background-image: linear-gradient(
-                to right,
-                #BBBBBB 50%, /* 您可以修改这个颜色 */
-                transparent 50%
-            );
-            animation: scoped-move-progress 1.5s linear infinite;
-            }
-
-            /* 定义进度条移动动画 */
-            @keyframes scoped-move-progress {
-            from {
-                background-position: 100% 0;
-            }
-            to {
-                background-position: -100% 0;
-            }
-            }
-        </style>
-
-        <!-- 实现动画的HTML元素 -->
-        <div class="progress-container">
-            <div class="progress-bar"></div>
-        </div>
-        </div>
-    `
     const show_waiting = Number(llmSettingValues['llmWaitAnimation']) === 1;
     // const waitingAnimator = new TextProgressAnimator(ANIMATION_INTERVAL_MS, show_waiting, 'Waiting'); 
-    const waitingAnimator = new FloatProgressAnimator('notellm_waiting_anim', show_waiting, WAITING_HTML); 
+    const waitingAnimator = new FloatProgressAnimator('notellm_waiting_anim', show_waiting, FLOATING_HTML_WAITING); 
     //
     // think 动效
-    const THINKING_HTML = `
-        <div class="scoped-thinking-loader">
-        <!-- 内部CSS样式和动画定义 -->
-        <style>
-            /* 
-            * 所有样式都封装在 .scoped-thinking-loader 内部，以避免全局样式冲突。
-            */
-            .scoped-thinking-loader {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            min-height: 30px; /* 确保有足够的高度来展示动画 */
-            font-family: 'Arial', sans-serif; /* 您可以更换成您喜欢的字体 */
-            font-size: 1rem; /* 字体大小 */
-            color: #FFFFFF; /* 字体颜色 */
-            }
-
-            /* 每个字母的容器 */
-            .scoped-thinking-loader .letter-container {
-            display: flex;
-            }
-
-            /* 应用于每个字母的动画 */
-            .scoped-thinking-loader .letter {
-            /* 
-            * 动画名称: scoped-letter-bounce
-            * 持续时间: 1.4s
-            * 速度曲线: ease-in-out (慢-快-慢，效果更自然)
-            * 循环次数: infinite (无限循环)
-            */
-            animation: scoped-letter-bounce 2.5s linear infinite;
-            }
-
-            /* 
-            * 使用 :nth-child 选择器为每个字母设置不同的动画延迟（animation-delay）
-            * 这是实现“不同步”跳动的关键！
-            */
-            .scoped-thinking-loader .letter:nth-child(1) { animation-delay: 0s; }
-            .scoped-thinking-loader .letter:nth-child(2) { animation-delay: 0.2s; }
-            .scoped-thinking-loader .letter:nth-child(3) { animation-delay: 0.4s; }
-            .scoped-thinking-loader .letter:nth-child(4) { animation-delay: 0.6s; }
-            .scoped-thinking-loader .letter:nth-child(5) { animation-delay: 0.8s; }
-            .scoped-thinking-loader .letter:nth-child(6) { animation-delay: 1s; }
-            .scoped-thinking-loader .letter:nth-child(7) { animation-delay: 1.2s; }
-            .scoped-thinking-loader .letter:nth-child(8) { animation-delay: 1.4s; }
-            .scoped-thinking-loader .letter:nth-child(9) { animation-delay: 1.6s; }
-            .scoped-thinking-loader .letter:nth-child(10) { animation-delay: 1.8s; }
-            .scoped-thinking-loader .letter:nth-child(11) { animation-delay: 2.0s; }
-
-            /* 
-            * 定义一个唯一的动画名称，避免冲突
-            * 0% -> 50% -> 100% 的关键帧定义了一个完整的“跳起再落下”的动作
-            */
-            @keyframes scoped-letter-bounce {
-            0%, 20%, 100% {
-                transform: translateY(0px);
-            }
-            10% { transform: translateY(-5px);}
-            }
-        </style>
-
-        <!-- HTML结构：将每个字母用 <span> 包裹起来 -->
-        <div class="letter-container">
-            <span class="letter">T</span>
-            <span class="letter">h</span>
-            <span class="letter">i</span>
-            <span class="letter">n</span>
-            <span class="letter">k</span>
-            <span class="letter">i</span>
-            <span class="letter">n</span>
-            <span class="letter">g</span>
-            <span class="letter">.</span><span class="letter">.</span><span class="letter">.</span>
-        </div>
-        </div>`
     const hide_thinking = Number(llmSettingValues['llmChatSkipThink']) === 1;
     // const thinkingAnimator = new TextProgressAnimator(ANIMATION_INTERVAL_MS, hide_thinking, 'Thinking'); 
-    const thinkingAnimator = new FloatProgressAnimator('notellm_thinking_anim', hide_thinking, THINKING_HTML, COLOR_FLOAT_NORMAL); 
+    const thinkingAnimator = new FloatProgressAnimator('notellm_thinking_anim', hide_thinking, FLOATING_HTML_THINKING, COLOR_FLOAT_NORMAL); 
     let thinking_status = 'not_started';
     //
     // 开始等待
@@ -710,6 +607,20 @@ export async function llmReplyStream({
     // ============= ================= ==============
     // 工具 MCP
     //
+    let MCP_SERVER_URL = '';
+    if (MCP_MODE == 'mcp'){
+        MCP_SERVER_URL = MCP_SERVER + '/mcp/get_tools'
+    }
+    else if (MCP_MODE == 'agent'){
+        MCP_SERVER_URL = MCP_SERVER + '/mcp/get_agents'
+    }
+    if (IS_MCP_ENABLED) {
+        let is_mcp_server_available = await checkServerStatus(MCP_SERVER);
+        if (is_mcp_server_available.status != 'online') {
+            console.info('MCP server unavailable')
+            IS_MCP_ENABLED = false;
+        }
+    }
     if (IS_MCP_ENABLED && round_tool_call <= MAX_TOOL_CALL_ROUND) {  
         //
         // 首先需要获取工具列表，用于组装消息体
@@ -717,13 +628,6 @@ export async function llmReplyStream({
             requestBody['tools'] = lst_tools_input;
         }
         else {  // 通过API获取可用工具的列表
-            let MCP_SERVER_URL = '';
-            if (MCP_MODE == 'mcp'){
-                MCP_SERVER_URL = MCP_SERVER + '/mcp/get_tools'
-            }
-            else if (MCP_MODE == 'agent'){
-                MCP_SERVER_URL = MCP_SERVER + '/mcp/get_agents'
-            }
             let openai_tools = await fetch(MCP_SERVER_URL)
                 .then(mcp_response => {
                     if (!mcp_response.ok) {
@@ -1104,7 +1008,12 @@ export async function llmReplyStream({
                     let tool_call_name = ''
                     let json_body:string;
                     MCP_RUN_URL = MCP_SERVER + '/mcp/call_tool'
-                    tool_call_name = tool_call_one.function.name
+                    if (MCP_MODE == 'agent'){
+                        tool_call_name = 'call_agents';  // 其实可以不写，但某些模型智力不够，避免弄错可以强制指定
+                    }
+                    else {
+                        tool_call_name = tool_call_one.function.name
+                    }
                     json_body = JSON.stringify({
                         name: tool_call_name,
                         arguments: tool_call_one.function.arguments

@@ -264,6 +264,15 @@ export async function registerSettings(): Promise<void> {
           2: 'Agent'
         }
       },
+      llmMcpServer:{
+        type: SettingItemType.String,
+        value: '',
+        label: 'URL for MCP Server',
+        description: 'e.g. http://127.0.0.1:18080.',
+        section: 'notellm.settings',
+        public: true,
+        advanced: true,
+      }
     });
 }
 

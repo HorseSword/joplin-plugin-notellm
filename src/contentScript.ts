@@ -181,7 +181,7 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                 myInsertText(inp_str);
             });
             //
-            // ====== TEST ===== ======== =========== === ========= ======== 
+            // ====== LineWidget ===== ======== =========== === ========= ======== 
             //            
             /**
              * 单行控件
@@ -352,7 +352,7 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
             codeMirrorWrapper.addExtension(lineWidgetField);
             // codeMirrorWrapper.addExtension(lineNumbers());
             //
-            // ================= ================ ==================
+            // ======= Floating Object ========== ================ ==================
             // 悬浮控件，用于显示提示内容
             /*
             用法：
