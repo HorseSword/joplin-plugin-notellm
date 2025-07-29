@@ -417,11 +417,17 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                     floatingEl.style.opacity = '1';
                     floatingEl.style.right = '-60px';
                 }, 10);
+
+                return {
+                    'id': floatingEl.id,
+                    'height': floatingEl.offsetHeight,
+                    'bottom': floatingEl.style.bottom
+                };
             }
             codeMirrorWrapper.registerCommand("cm-addFloatingObject", 
                 (payload: { text: string, floatId:string, bgColor?:string }) => {
                     let { text, floatId, bgColor=FLOATING_OBJECT_BG } = payload;
-                    add_floating_object( text, floatId, bgColor);
+                    return add_floating_object( text, floatId, bgColor);
             });
             //
             function remove_floating_object (floatId:string) {
@@ -431,7 +437,7 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                     floatingEl.style.right = '-100px';
                     setTimeout(() => {
                         floatingEl.remove();
-                    }, 500);
+                    }, 210);
                     // floatingEl.remove();
                 }
             }
@@ -452,16 +458,17 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
             function temp_floating_object( text: string, floatId:string, 
                 bgColor:string = FLOATING_OBJECT_BG, ms: number = 2000){
                     //
-                    add_floating_object(text, floatId, bgColor);
+                    let d = add_floating_object(text, floatId, bgColor);
                     //
                     setTimeout(() =>{
                         remove_floating_object(floatId);
                     }, ms);
+                    return d;
             }
             codeMirrorWrapper.registerCommand("cm-tempFloatingObject", 
                 (payload: { text: string, floatId:string, bgColor?:string, ms?:number }) => {
                     let { text, floatId, bgColor = FLOATING_OBJECT_BG, ms = 3000 } = payload;
-                    temp_floating_object( text, floatId, bgColor, ms);
+                    return temp_floating_object( text, floatId, bgColor, ms);
             });
         },
     };

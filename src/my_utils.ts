@@ -1,7 +1,10 @@
 import { getCurves } from 'crypto';
 import joplin from '../api';
 import {getTxt} from './texts';
-import { FLOATING_HTML_BASIC, FLOATING_HTML_THINKING, FLOATING_HTML_WAITING } from './pluginFloatingObject';
+import { FLOATING_HTML_BASIC, FLOATING_HTML_THINKING, FLOATING_HTML_WAITING, 
+    makeJumpingHtml,
+    FloatProgressAnimator
+ } from './pluginFloatingObject';
 
 const COLOR_FLOAT_FINISH = '#3bba9c'  // 绿色
 const COLOR_FLOAT_SETTING = '#535f80'  // 蓝灰提示
@@ -33,298 +36,7 @@ export async function scroll_to_view (mode:string='none') {
         // 其他的不做任何事情
     }
 }
-/**
- * text animation class
- * 
-// 1. 插件初始化时，创建一个实例
-// const waitingAnimator = new TextProgressAnimator();
 
-// 2. 当需要开启动画时
-// await waitingAnimator.start();
-
-// 3. 当需要关闭动画时
-// await waitingAnimator.stop();
- */
-class TextProgressAnimator {
-    // 1. 在顶部声明所有类属性及其类型
-    private note_id: string | null;  // 记录笔记编号，避免中途切换
-    private animation_interval_id: any; // setTimeout 返回的 ID 类型在不同环境（Node/Browser）可能不同，any 是最简单的选择
-    private animation_start_pos: number | null;  // 开始位置
-    private animation_end_pos: number | null;  // 结束位置
-    private animation_row: number | null;
-    private animation_uuid: string | null;
-    private animation_progress_str: string;  // 
-    private animation_index: number; // 当前的动画序号
-    private is_running: boolean;  // 运行状态
-    //
-    // 这些属性可以在构造时传入，设为 public
-    public animation_interval: number;
-    public is_enabled: boolean;  // 这个数来自设置文件，但最好传参获取
-    //
-    // 私有常量
-    private readonly animationStates: string[];
-    //
-    constructor(animation_interval: number = 100, is_enabled: boolean = true, anim_text: string = 'Waiting') {
-        // 在构造函数中初始化属性
-        this.animation_interval = animation_interval;
-        this.is_enabled = is_enabled;
-        //
-        // 初始化其他内部状态
-        this.note_id = null;
-        this.animation_interval_id = null;
-        this.animation_start_pos = null;
-        this.animation_end_pos = null;
-        this.animation_row = null;
-        this.animation_uuid = 'widget-' + Date.now();
-        this.animation_progress_str = '';
-        this.animation_index = 0;
-        this.is_running = false;
-        this.animationStates = [
-            `(${anim_text}......)`, `(.${anim_text}.....)`, `(..${anim_text}....)`, 
-            `(...${anim_text}...)`, `(....${anim_text}..)`, `(.....${anim_text}.)`, 
-            `(......${anim_text})`, `(.....${anim_text}.)`, `(....${anim_text}..)`, 
-            `(...${anim_text}...)`, `(..${anim_text}....)`, `(.${anim_text}.....)`,
-        ];
-    }
-
-    /**
-     * 启动等待动画 (公共方法)
-     * @param note_id - 当前笔记的 ID
-     */
-    public async start(): Promise<void> {
-        if (this.is_running || !this.is_enabled) {
-            return;
-        }
-        //
-        try {
-            let current_note = await joplin.workspace.selectedNote();
-            this.note_id = current_note.id;
-            this.is_running = true;
-            //
-            // 获取当前的光标位置
-            let tmp_cur_pos = await joplin.commands.execute('editor.execCommand', {
-                name: 'cm-getCursorPos'
-            });
-            this.animation_start_pos = tmp_cur_pos.startLine.from + tmp_cur_pos.startPosition.column;
-            this.animation_end_pos = this.animation_start_pos;
-            this.animation_index = 0;
-            this.animation_row = tmp_cur_pos.endLine.number - 1;
-        }
-        catch {
-            this.note_id = null;
-            this.is_running = false;
-            return;
-        }
-        //
-        // 立即执行第一次动画，然后设置下一次的延时
-        this.animate();
-    }
-
-    /**
-     * 停止等待动画 (公共方法)
-     * @param clear_text - 是否需要清除编辑器中的等待文本
-     */
-    public async stop(clear_text: boolean = true): Promise<void> {
-        //
-        if (!this.is_running) {
-            return;
-        }
-        await joplin.commands.execute('editor.execCommand', {
-            name: 'cm-removeFloatingObject',
-            args: [this.animation_uuid]
-        });
-        //
-        if (this.animation_interval_id) {
-            clearTimeout(this.animation_interval_id);
-            this.animation_interval_id = null;
-        }
-        else {
-            return;
-        }
-        //
-        if (clear_text) {
-            // await joplin.commands.execute('editor.execCommand', {
-            //     name: 'cm-replaceRange',
-            //     args: [this.animation_start_pos, this.animation_end_pos, '']  // 删除等待文本
-            // });
-            // await joplin.commands.execute('editor.execCommand', {
-            //     name: 'cm-removeLineWidget',
-            //     args: [{ 
-            //         widgetId: this.animation_uuid, 
-            //     }]
-            // });
-            await joplin.commands.execute('editor.execCommand', {
-                name: 'cm-removeFloatingObject',
-                args: [this.animation_uuid]
-            });
-        }
-        //
-        this.note_id = null;
-        this.is_running = false;
-        //
-    }
-
-    // 内部动画循环 (私有方法)
-    private async animate(): Promise<void> {
-        if (!this.is_running) {
-            return;
-        }
-        //
-        try {
-            // 每次都获取笔记编号，避免切换
-            const current_note = await joplin.workspace.selectedNote();
-            if (!current_note || current_note.id !== this.note_id) {
-                console.log("Note changed or is null, stopping animation gracefully.");
-                await this.stop(false);
-                return;
-            }
-            if (this.is_running) {
-                this.animation_index = (this.animation_index + 1) % this.animationStates.length;
-                this.animation_progress_str = this.animationStates[this.animation_index];
-
-                // await joplin.commands.execute('editor.execCommand', {
-                //     name: 'cm-replaceRange',
-                //     args: [this.animation_start_pos, this.animation_end_pos, this.animation_progress_str]
-                // });
-                if (this.animation_end_pos == this.animation_start_pos){
-                    // await joplin.commands.execute('editor.execCommand', {
-                    //     name: 'cm-addLineWidget',
-                    //     args: [{ 
-                    //         line: this.animation_row, 
-                    //         htmlString:`<center>${this.animation_progress_str}</center>`,
-                    //         // htmlString:`<p>${this.animation_progress_str}</p>`,
-                    //         // htmlString:`${this.animation_progress_str}`,
-                    //         widgetId: this.animation_uuid, 
-                    //     }]
-                    // });
-                    await joplin.commands.execute('editor.execCommand', {
-                        name: 'cm-addFloatingObject',
-                        args: [{ text: this.animation_progress_str, floatId: this.animation_uuid }]
-                    });
-                }
-                else {
-                    // await joplin.commands.execute('editor.execCommand', {
-                    //     name: 'cm-updateLineWidget',
-                    //     args: [{ 
-                    //         // line: this.animation_row, 
-                    //         htmlString:`<center>${this.animation_progress_str}</center>`,
-                    //         // htmlString:`${this.animation_progress_str}`,
-                    //         // htmlString:`<p>${this.animation_progress_str}</p>`,
-                    //         widgetId: this.animation_uuid, 
-                    //     }]
-                    // });
-                    // await joplin.commands.execute('editor.execCommand', {
-                    //     name: 'cm-removeFloatingObject',
-                    // });
-                    await joplin.commands.execute('editor.execCommand', {
-                        name: 'cm-addFloatingObject',
-                        args: [{ text: this.animation_progress_str, floatId: this.animation_uuid }]
-                    });
-                }
-
-                // await joplin.commands.execute('editor.execCommand', {
-                //     name: 'cm-removeLineWidget',
-                //     args: [{ 
-                //         widgetId: this.animation_uuid, 
-                //     }]
-                // });
-                // await joplin.commands.execute('editor.execCommand', {
-                //     name: 'cm-addLineWidget',
-                //     args: [{ 
-                //         line: this.animation_row, 
-                //         htmlString:`<center>${this.animation_progress_str}</center>`,
-                //         widgetId: this.animation_uuid, 
-                //     }]
-                // });
-                
-                this.animation_end_pos = this.animation_start_pos + this.animation_progress_str.length;
-
-                this.animation_interval_id = setTimeout(() => this.animate(), this.animation_interval);
-            }
-            //
-        } catch (error) {
-            console.error("Error during animation:", error);
-            await this.stop(false);
-        }
-    }
-}
-/**
- * 用自定义悬浮体实现的进度显示
- */
-class FloatProgressAnimator {
-    // 1. 在顶部声明所有类属性及其类型
-    private animation_uuid: string | null;
-    private animation_progress_str: string;  // 显示进度的 html 文本
-    private is_running: boolean;  // 运行状态
-    //
-    // 这些属性可以在构造时传入，设为 public
-    public animation_interval: number;  // 暂时没用
-    public is_enabled: boolean;  // 这个数来自设置文件，但最好传参获取
-    public bg_color:string;
-    //
-    constructor(animation_uuid: string = 'notellm_animation', is_enabled: boolean = true, anim_text: string = '', bg_color:string = '#4d53b3') {
-        // 在构造函数中初始化属性
-        this.is_enabled = is_enabled;
-        this.bg_color = bg_color;
-        //
-        // 初始化其他内部状态
-        this.animation_uuid = animation_uuid;
-        this.animation_progress_str = anim_text;
-        this.is_running = false;
-        if (this.animation_progress_str.trim().length < 1) {  // 如果外部没有定义的话
-            this.animation_progress_str = FLOATING_HTML_BASIC
-        }
-    }
-    /**
-     * 启动等待动画 (公共方法)
-     * @param note_id - 当前笔记的 ID
-     */
-    public async start(): Promise<void> {
-        if (this.is_running || !this.is_enabled) {
-            return;
-        }
-        //
-        try {
-            //
-            this.is_running = true;
-            //
-            await joplin.commands.execute('editor.execCommand', {
-                name: 'cm-addFloatingObject',
-                args: [{ text: this.animation_progress_str, floatId: this.animation_uuid, bgColor: this.bg_color }]
-            });
-            console.log(this.animation_uuid);
-        }
-        catch {
-            this.stop();
-            this.is_running = false;
-            return;
-        }
-    }
-
-    /**
-     * 停止等待动画 (公共方法)
-     * @param clear_float - 是否需要清除编辑器中的等待文本
-     */
-    public async stop(clear_float: boolean = true): Promise<void> {
-        //
-        await joplin.commands.execute('editor.execCommand', {
-            name: 'cm-removeFloatingObject',
-            args: [this.animation_uuid]
-        });
-        // if (!this.is_running) {
-        //     return;
-        // }
-        // if (clear_float) {
-        //     await joplin.commands.execute('editor.execCommand', {
-        //         name: 'cm-removeFloatingObject',
-        //         args: [{floatId: this.animation_uuid}]
-        //     });
-        // }
-        //
-        this.is_running = false;
-        //
-    }
-}
 //
 /**
  * 检查服务器状态是否可用
@@ -332,7 +44,10 @@ class FloatProgressAnimator {
  * @param {number} [timeout=1000] 超时时间，单位为毫秒
  * @returns {Promise<{status: 'online' | 'offline' | 'timeout' | 'error', message: string}>}
  */
-async function checkServerStatus(url:string, timeout = 1000) {
+async function checkServerStatus(url:string, 
+    timeout: number = 1000): Promise<{ status: 'online' | 'offline' | 'timeout' | 'error'; 
+    message: string; }> {
+    //
     // AbortController 是实现超时的关键
     const controller = new AbortController();
     const signal = controller.signal;
@@ -508,7 +223,9 @@ export async function llmReplyStream({
     };
     //
     // 光标移动到选区最末尾
-    await joplin.commands.execute('editor.execCommand', {name: 'cm-moveCursorToSelectionEnd'});
+    await joplin.commands.execute('editor.execCommand', 
+        {name: 'cm-moveCursorToSelectionEnd'}
+    );
     // 滚动条移动到光标位置
     await scroll_to_view(scroll_type);
     // 
@@ -615,17 +332,23 @@ export async function llmReplyStream({
         MCP_SERVER_URL = MCP_SERVER + '/mcp/get_agents'
     }
     if (IS_MCP_ENABLED) {
+        // 服务器是否可用
         let is_mcp_server_available = await checkServerStatus(MCP_SERVER);
         if (is_mcp_server_available.status != 'online') {
             console.info('MCP server unavailable')
             IS_MCP_ENABLED = false;
         }
+        // 轮数是否过多
+        if (round_tool_call > MAX_TOOL_CALL_ROUND) {
+            IS_MCP_ENABLED = false;
+        }
     }
-    if (IS_MCP_ENABLED && round_tool_call <= MAX_TOOL_CALL_ROUND) {  
+    if (IS_MCP_ENABLED) {  
         //
         // 首先需要获取工具列表，用于组装消息体
         if (lst_tools_input.length>0){ // 直接指定工具列表，不再通过请求获取
             requestBody['tools'] = lst_tools_input;
+            requestBody['temperature'] = 0;
         }
         else {  // 通过API获取可用工具的列表
             let openai_tools = await fetch(MCP_SERVER_URL)
@@ -649,6 +372,30 @@ export async function llmReplyStream({
                 requestBody['tools'] = openai_tools['tools'];
             }
         }
+    }
+    /**
+     * 调用工具时，显示工具名称
+     * @param tool_name 
+     */
+    async function on_tool_call_start(tool_name:string){
+        // await joplin.commands.execute('editor.execCommand', {
+        //     name: 'cm-tempFloatingObject',
+        //     args: [{ text: `Calling ${tool_name}, please wait.`, 
+        //         floatId: String(2500+(Date.now()%500)), ms: 2000, bgColor: COLOR_FLOAT_SETTING }]
+        // });
+        let mcp_text = `Calling ${tool_name}, please wait...`
+        await joplin.commands.execute('editor.execCommand', {
+            name: 'cm-addFloatingObject',
+            args: [{ text: makeJumpingHtml(mcp_text), 
+                floatId: 'on_tool_call_start', 
+                bgColor: COLOR_FLOAT_NORMAL }]
+        });
+    }
+    async function on_tool_call_end(tool_name:string) {
+        await joplin.commands.execute('editor.execCommand', {
+            name: 'cm-removeFloatingObject',
+            args: ['on_tool_call_start']
+        });
     }
     //
     // 根据自定义设置，覆盖修改现有的配置项
@@ -779,7 +526,7 @@ export async function llmReplyStream({
             //
             // 解码并解析数据块
             const chunk:string = decoder.decode(value, { stream: true });
-            console.info('Stream Chunk = ', chunk);
+            // console.info('Stream Chunk = ', chunk);
             //
             // 解析 JSON 行
             if (typeof chunk === "string"){  // 块作为整体，因为一次可能收到多行，每行都是 data: 开头，或者纯空行
@@ -791,7 +538,7 @@ export async function llmReplyStream({
                     // 理论上讲，这里拆解并不会将 json 中间断开，因为换行符都被转义了
                     // 所以拆出来的全都是完整的 data: 行
                     // 但考虑到网络传输，可能会有 data: 被中间切断，所以最稳的方法是 buffer 缓存。 TODO
-                    console.info(`chunk_line = ${data_line}`)
+                    // console.info(`chunk_line = ${data_line}`)
                     const trimmedLine = data_line.trim();
                     // 忽略空行或无效行
                     if (!trimmedLine || !trimmedLine.startsWith('data:')) {
@@ -1008,11 +755,27 @@ export async function llmReplyStream({
                     let tool_call_name = ''
                     let json_body:string;
                     MCP_RUN_URL = MCP_SERVER + '/mcp/call_tool'
+                    //
                     if (MCP_MODE == 'agent'){
                         tool_call_name = 'call_agents';  // 其实可以不写，但某些模型智力不够，避免弄错可以强制指定
+                        // if ("agent_id" in tool_call_one.function.arguments){
+                        //     console.log(tool_call_one.function.arguments)
+                        // }
+                        // else {
+                        //     throw new Error('关键参数缺失');
+                        // }
+                        try{
+                            let agent_name = tool_call_one.function.arguments
+                            await on_tool_call_start(agent_name);
+                        }
+                        catch(e){
+                            console.log(`Line 761: ${e}`)
+                            //
+                        }
                     }
                     else {
                         tool_call_name = tool_call_one.function.name
+                        await on_tool_call_start(tool_call_name);
                     }
                     json_body = JSON.stringify({
                         name: tool_call_name,
@@ -1034,9 +797,16 @@ export async function llmReplyStream({
                     tool_result_one = await tool_call_response.json(); // 将响应结果保存到变量 a
                     console.log('请求成功:', tool_result_one);
                     lst_tool_result.push(tool_result_one);
+                    
+                    if (MCP_MODE == 'agent'){
+                        round_tool_call = MAX_TOOL_CALL_ROUND + 1;  // agent成功之后，不再调用其他 
+                    }
                 } 
                 catch (error) {
                     console.error('请求失败:', error);
+                }
+                finally {
+                    await on_tool_call_end(tool_call_one);
                 }
             }
             console.log(`lst_tool_result = ${lst_tool_result}`)  // 正常工作
@@ -1044,8 +814,9 @@ export async function llmReplyStream({
             console.log(`Type of lst_tool_result[0] is: ${typeof lst_tool_result[0]}`);
 
             //
-            // 重新运行获取大模型回复
+            // 重新运行，获取大模型回复
             console.log(`tool_name_cache = ${tool_name_cache}`);
+            //
             if (tool_name_cache == 'get_tool_groups') {  // get_tool_groups 专用于获取工具组内详情
                 let second_list_tool = []
                 try{
@@ -1069,24 +840,15 @@ export async function llmReplyStream({
                 let prompt_messages_with_tool_result = [
                     ...prompt_messages, 
                     // {'role':'system','content':`tool_call result: ${JSON.stringify(lst_tool_result)}`}
-                    {'role':'system','content':`tool_call result: ${lst_tool_result}`}
+                    {'role':'system','content':`Tool results: ${lst_tool_result}`}
                 ];
                 console.log('prompt_messages_with_tool_result = ', prompt_messages_with_tool_result);
                 //
-                if (MCP_MODE == 'agent'){  // agent模式不再重复调用
-                    await llmReplyStream({
-                        'inp_str' : 'null', 
-                        'lst_msg' : prompt_messages_with_tool_result, 
-                        'round_tool_call': MAX_TOOL_CALL_ROUND + 1,
-                    });
-                }
-                else{
-                    await llmReplyStream({
-                        'inp_str' : 'null', 
-                        'lst_msg' : prompt_messages_with_tool_result, 
-                        'round_tool_call': round_tool_call + 1
-                    });
-                }
+                await llmReplyStream({
+                    'inp_str' : 'null', 
+                    'lst_msg' : prompt_messages_with_tool_result, 
+                    'round_tool_call': round_tool_call + 1
+                });
             }
         }
     }

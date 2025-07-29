@@ -1,9 +1,19 @@
+import joplin from '../api';
+
+/**
+ * 悬浮窗体相关代码。
+ */
+
 const FLOATING_OBJECT_ID = 'notellm-floating-object';
 const FLOATING_OBJECT_BG = '#4d53b3'; // 深蓝  // 'rgba(10, 100, 200, 0.9)';
+const COLOR_FLOAT_FINISH = '#3bba9c'  // 绿色
+const COLOR_FLOAT_SETTING = '#535f80'  // 蓝灰提示
+const COLOR_FLOAT_NORMAL = '#388087' // 青绿色
+const COLOR_FLOAT_WARNING = '#e67235'  // 橙色警告
 
-
-export function add_floating_object (text: string, floatId:string, bgColor:string = FLOATING_OBJECT_BG) {
-
+export function add_floating_object (text: string, floatId:string, 
+    bgColor:string = FLOATING_OBJECT_BG) {
+    //
     // 1. 检查悬浮对象是否已存在
     let floatingEl = document.getElementById(floatId);
 
@@ -150,9 +160,62 @@ export const FLOATING_HTML_THINKING = `
         <span class="letter">i</span>
         <span class="letter">n</span>
         <span class="letter">g</span>
-        <span class="letter">.</span><span class="letter">.</span><span class="letter">.</span>
+        <span class="letter">.</span>
+        <span class="letter">.</span>
+        <span class="letter">.</span>
     </div>
     </div>`
+
+export function makeJumpingHtml(jumping_str = 'Thinking...') {
+    const letters = jumping_str.split('').map((char, index) => {
+        const safeChar = char === ' ' ? '&nbsp;' : char;
+        return `<span class="letter">${safeChar}</span>`;
+    }).join('');
+
+    return `
+        <div class="scoped-thinking-loader">
+        <style>
+            .scoped-thinking-loader {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                width: 100%;
+                min-height: 30px;
+                font-family: 'Arial', 'Microsoft YaHei', sans-serif;
+                font-size: 1rem;
+                color: #FFFFFF;
+            }
+            .scoped-thinking-loader .letter-container {
+                display: flex;
+            }
+            .scoped-thinking-loader .letter {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                line-height: 1; /* 统一行高 */
+                animation: scoped-letter-bounce 5.0s linear infinite;
+            }
+
+            ${jumping_str.split('').map((_, i) => {
+                const delay = (i * 0.2).toFixed(1);
+                return `.scoped-thinking-loader .letter:nth-child(${i + 1}) { animation-delay: ${delay}s; }`;
+            }).join('\n')}
+
+            @keyframes scoped-letter-bounce {
+                0%, 10%, 100% {
+                    transform: translateY(0px);
+                }
+                5% {
+                    transform: translateY(-5px);
+                }
+            }
+        </style>
+        <div class="letter-container">
+            ${letters}
+        </div>
+        </div>
+    `;
+}
 
 export const FLOATING_HTML_WAITING = `
     <div class="scoped-progress-bar-wrapper">
@@ -246,3 +309,141 @@ export const FLOATING_HTML_BASIC = `
     <div class="ball"></div>
     <div class="ball"></div>
     </div>`
+
+    /**
+ * 用自定义悬浮体实现的进度显示
+ */
+export class FloatProgressAnimator {
+    // 1. 在顶部声明所有类属性及其类型
+    private animation_uuid: string | null;
+    private animation_progress_str: string;  // 显示进度的 html 文本
+    private is_running: boolean;  // 运行状态
+    private height: number;
+    private bottom: number;
+    private div: any;
+    //
+    // 这些属性可以在构造时传入，设为 public
+    public animation_interval: number;  // 暂时没用
+    public is_enabled: boolean;  // 这个数来自设置文件，但最好传参获取
+    public bg_color:string;
+    //
+    constructor(animation_uuid: string = 'notellm_animation', is_enabled: boolean = true, 
+        anim_text: string = '', bg_color:string = FLOATING_OBJECT_BG) {
+        // 在构造函数中初始化属性
+        this.is_enabled = is_enabled;
+        this.bg_color = bg_color;
+        //
+        // 初始化其他内部状态
+        this.animation_uuid = animation_uuid;
+        this.animation_progress_str = anim_text;
+        this.is_running = false;
+        if (this.animation_progress_str.trim().length < 1) {  // 如果外部没有定义的话
+            this.animation_progress_str = FLOATING_HTML_BASIC
+        }
+    }
+    /**
+     * 启动等待动画 (公共方法)
+     * @param note_id - 当前笔记的 ID
+     */
+    public async start(): Promise<void> {
+        if (this.is_running || !this.is_enabled) {
+            return;
+        }
+        //
+        try {
+            //
+            this.is_running = true;
+            //
+            let d = await joplin.commands.execute('editor.execCommand', {
+                name: 'cm-addFloatingObject',
+                args: [{ text: this.animation_progress_str, floatId: this.animation_uuid, bgColor: this.bg_color }]
+            });
+            this.height = d['height'];
+            this.bottom = d['bottom'];
+            console.log(this.animation_uuid);
+            console.log(d);
+        }
+        catch {
+            this.stop();
+            this.is_running = false;
+            return;
+        }
+    }
+
+    /**
+     * 停止等待动画 (公共方法)
+     * @param clear_float - 是否需要清除编辑器中的等待文本
+     */
+    public async stop(clear_float: boolean = true): Promise<void> {
+        //
+        await joplin.commands.execute('editor.execCommand', {
+            name: 'cm-removeFloatingObject',
+            args: [this.animation_uuid]
+        });
+        this.is_running = false;
+        //
+    }
+}
+
+/**
+ * 自定义 Toast 管理器
+ * 用途：
+ * - 生成toast
+ * - 关闭toast
+ */
+export class FloatingToastManager {
+    // 1. 在顶部声明所有类属性及其类型
+    private animation_uuid: string | null;
+    private animation_progress_str: string;  // 显示进度的 html 文本
+    private is_running: boolean;  // 运行状态
+    private dict_toast = [];
+    //
+    // 这些属性可以在构造时传入，设为 public
+    public is_enabled: boolean;  // 这个数来自设置文件，但最好传参获取
+    public bg_color:string;
+    //
+    constructor(animation_uuid: string = 'notellm_animation', is_enabled: boolean = true, 
+        anim_text: string = '', bg_color:string = FLOATING_OBJECT_BG) {
+        // 在构造函数中初始化属性
+        this.is_enabled = is_enabled;
+        this.bg_color = bg_color;
+        //
+        // 初始化其他内部状态
+        this.animation_uuid = animation_uuid;
+        this.animation_progress_str = anim_text;
+        this.is_running = false;
+        if (this.animation_progress_str.trim().length < 1) {  // 如果外部没有定义的话
+            this.animation_progress_str = FLOATING_HTML_BASIC
+        }
+    }
+
+    public async add_toast(toast_id:string, toast_html:string, 
+        toast_type:string='default'): Promise<void> {
+        // 添加 toast
+        //
+        if (toast_type == 'default') {
+            //
+        }
+        // 旧的上移
+
+        // 增加新的
+        let waitingAnimator = new FloatProgressAnimator('notellm_waiting_anim', true, toast_html);
+        this.dict_toast[toast_id] = waitingAnimator;
+        this.dict_toast[toast_id].start();
+    }
+
+    public async add_temp_toast(): Promise<void> {
+        // 临时 toast
+        // 定时结束后，检查移动需求
+
+    }
+
+    public async stop_toast(toast_id:string) {
+        this.dict_toast[toast_id].stop();
+        //
+        // 以上的向下移动
+    }
+
+    public async stop_all() {
+    }
+}
