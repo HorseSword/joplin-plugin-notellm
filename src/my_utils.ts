@@ -1,4 +1,4 @@
-import { getCurves } from 'crypto';
+// import { getCurves } from 'crypto';  // I think, this is useless. Why here?
 import joplin from '../api';
 import {getTxt} from './texts';
 import { FLOATING_HTML_BASIC, FLOATING_HTML_THINKING, FLOATING_HTML_WAITING, 
