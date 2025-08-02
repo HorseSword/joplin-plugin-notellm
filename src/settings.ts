@@ -70,6 +70,21 @@ export async function registerSettings(): Promise<void> {
         public: true,
         advanced: true,
       },
+      llmMcp: { 
+        type: SettingItemType.Int,
+        value: 0,
+        label: 'MCP for LLM1 (Preview)', 
+        description: 'Turn ON to use MCP.', 
+        section: 'notellm.settings',
+        public: true,
+        advanced: true,
+        isEnum: true,
+        options: {
+          0: 'OFF',
+          10: 'MCP (tool call)',
+          20: 'Agent'
+        }
+      },
       //
       llmServerUrl2: {
         type: SettingItemType.String,
@@ -108,6 +123,21 @@ export async function registerSettings(): Promise<void> {
         section: 'notellm.settings',
         public: true,
         advanced: true,
+      },
+      llmMcp2: { 
+        type: SettingItemType.Int,
+        value: 0,
+        label: 'MCP for LLM2 (Preview)', 
+        description: 'Turn ON to use MCP.', 
+        section: 'notellm.settings',
+        public: true,
+        advanced: true,
+        isEnum: true,
+        options: {
+          0: 'OFF',
+          10: 'MCP (tool call)',
+          20: 'Agent'
+        }
       },
       //
       //
@@ -148,6 +178,21 @@ export async function registerSettings(): Promise<void> {
         section: 'notellm.settings',
         public: true,
         advanced: true,
+      },
+      llmMcp3: { 
+        type: SettingItemType.Int,
+        value: 0,
+        label: 'MCP for LLM3 (Preview)', 
+        description: 'Turn ON to use MCP.', 
+        section: 'notellm.settings',
+        public: true,
+        advanced: true,
+        isEnum: true,
+        options: {
+          0: 'OFF',
+          10: 'MCP (tool call)',
+          20: 'Agent'
+        }
       },
       // 高级选项
       //
@@ -222,22 +267,6 @@ export async function registerSettings(): Promise<void> {
         }
       },
       //
-      // animation for waiting
-      llmWaitAnimation: { 
-        type: SettingItemType.Int,
-        value: 0,
-        label: dictText['wait_animation_label'], 
-        description: dictText['wait_animation_desc'], 
-        section: 'notellm.settings',
-        public: true,
-        advanced: false,
-        isEnum: true,
-        options: {
-          1: 'ON',
-          0: 'OFF',
-        }
-      },
-      //
       // your prompt for chatting
       llmChatPrompt:{
         type: SettingItemType.String,
@@ -248,26 +277,11 @@ export async function registerSettings(): Promise<void> {
         public: true,
         advanced: true,
       },
-      // animation for waiting
-      llmMcp: { 
-        type: SettingItemType.Int,
-        value: 0,
-        label: 'MCP', 
-        description: 'Turn ON to use MCP.', 
-        section: 'notellm.settings',
-        public: true,
-        advanced: false,
-        isEnum: true,
-        options: {
-          0: 'OFF',
-          1: 'MCP',
-          2: 'Agent'
-        }
-      },
+      // 
       llmMcpServer:{
         type: SettingItemType.String,
         value: '',
-        label: 'URL for MCP Server',
+        label: 'URL for MCP Server (Preview)',
         description: 'e.g. http://127.0.0.1:18080.',
         section: 'notellm.settings',
         public: true,

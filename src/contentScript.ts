@@ -432,12 +432,16 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
             //
             function remove_floating_object (floatId:string) {
                 const floatingEl = document.getElementById(floatId);
+                let tm = 10;
                 if (floatingEl) {
-                    floatingEl.style.opacity = '0';
-                    floatingEl.style.right = '-100px';
+                    setTimeout(() => {
+                        floatingEl.style.opacity = '0';
+                        // floatingEl.style.bottom = '120px';  // 向上移动
+                        floatingEl.style.right = '-120px';  // 向右收回
+                    }, tm);
                     setTimeout(() => {
                         floatingEl.remove();
-                    }, 210);
+                    }, tm + 200);
                     // floatingEl.remove();
                 }
             }

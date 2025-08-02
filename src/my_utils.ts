@@ -37,6 +37,21 @@ export async function scroll_to_view (mode:string='none') {
     }
 }
 
+function formatDateTime(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0'); // 月份从0开始，需+1
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+function formatNow() {
+    const now = new Date();
+    return formatDateTime(now);
+}
 //
 /**
  * 检查服务器状态是否可用
@@ -45,8 +60,7 @@ export async function scroll_to_view (mode:string='none') {
  * @returns {Promise<{status: 'online' | 'offline' | 'timeout' | 'error', message: string}>}
  */
 async function checkServerStatus(url:string, 
-    timeout: number = 1000): Promise<{ status: 'online' | 'offline' | 'timeout' | 'error'; 
-    message: string; }> {
+    timeout: number = 1000): Promise<{ status: 'online' | 'offline' | 'timeout' | 'error'; message: string; }> {
     //
     // AbortController 是实现超时的关键
     const controller = new AbortController();
@@ -124,36 +138,39 @@ export async function llmReplyStream({
     // ===============================================================
     // 读取设置的参数
     const llmSettingValues = await joplin.settings.values([
-        'llmModel','llmServerUrl','llmKey','llmExtra',
-        'llmModel2','llmServerUrl2','llmKey2','llmExtra2',
-        'llmModel3','llmServerUrl3','llmKey3','llmExtra3',
+        'llmModel','llmServerUrl','llmKey', 'llmExtra', 'llmMcp',
+        'llmModel2','llmServerUrl2','llmKey2','llmExtra2','llmMcp2',
+        'llmModel3','llmServerUrl3','llmKey3','llmExtra3','llmMcp3',
         'llmSelect',
-        'llmTemperature','llmMaxTokens','llmScrollType',
-        'llmChatType','llmChatSkipThink', 'llmWaitAnimation',
-        'llmChatPrompt','llmMcp','llmMcpServer'
+        'llmTemperature', 'llmMaxTokens', 'llmScrollType',
+        'llmChatType', 'llmChatSkipThink', 'llmChatPrompt', 
+        'llmMcpServer'
     ]);
     // 基础参数
-    let llmSelect = llmSettingValues['llmSelect'];
-    llmSelect = parseInt(String(llmSelect));
+    let llmSelect = parseInt(String(llmSettingValues['llmSelect']));  // 模型入口序号
     //
     let apiModel = '', apiUrl = '', apiKey = '', extraConfig:any;
+    let mcp_number = 0;
     if(llmSelect==2){
         apiModel = String(llmSettingValues['llmModel2']);
         apiUrl = String(llmSettingValues['llmServerUrl2']) + '/chat/completions';
         apiKey = String(llmSettingValues['llmKey2']);
         extraConfig = String(llmSettingValues['llmExtra2']);
+        mcp_number = Number(llmSettingValues['llmMcp2']);
     }
     else if(llmSelect==3){
         apiModel = String(llmSettingValues['llmModel3']);
         apiUrl = String(llmSettingValues['llmServerUrl3']) + '/chat/completions';
         apiKey = String(llmSettingValues['llmKey3']);
         extraConfig = String(llmSettingValues['llmExtra3']);
+        mcp_number = Number(llmSettingValues['llmMcp3']);
     }
     else{
         apiModel = String(llmSettingValues['llmModel']);
         apiUrl = String(llmSettingValues['llmServerUrl']) + '/chat/completions';
         apiKey = String(llmSettingValues['llmKey']);
         extraConfig = String(llmSettingValues['llmExtra']);
+        mcp_number = Number(llmSettingValues['llmMcp']);
     }
     // 如果关键参数缺失，直接报错，不需要走后面的流程
     if (apiModel.trim() === '' || apiUrl.trim() === '' || apiKey.trim() === '') {
@@ -162,9 +179,7 @@ export async function llmReplyStream({
     }
     // 高级参数
     let apiTemperature = parseFloat(String(llmSettingValues['llmTemperature']));
-    //
     let apiMaxTokens = parseInt(String(llmSettingValues['llmMaxTokens'])) ;
-    //
     let llmScrollType = parseInt(String(llmSettingValues['llmScrollType'])) ;
     //
     let scroll_type = 'desktop';
@@ -181,18 +196,41 @@ export async function llmReplyStream({
     let prompt_for_chat = String(llmSettingValues['llmChatPrompt']);
     //
     // MCP 相关的参数
-    let mcp_number = Number(llmSettingValues['llmMcp']);
     const MCP_SERVER = String(llmSettingValues['llmMcpServer']);
     let IS_MCP_ENABLED = (mcp_number > 0 && MCP_SERVER.trim().length > 0);
     let MCP_MODE = 'mcp'  // agent, mcp, null
-    if (mcp_number == 1){
+    if (mcp_number == 10){
         MCP_MODE = 'mcp'
     }
-    else if (mcp_number == 2){
+    else if (mcp_number == 20){
         MCP_MODE = 'agent'
     }
-    
     const MAX_TOOL_CALL_ROUND = 7 // 不允许 MCP 的循环调用次数过多
+    //
+    const START_NOTE = await joplin.workspace.selectedNote(); // 启动时的笔记
+    // 
+    let result_whole = '' // 存储本次回复生成的完整文档。但好像并没有用到？
+    let cursor_pos:any;  // 光标位置
+    //
+    /**
+     * 获取光标的位置
+     * @returns 
+     */
+    async function get_cursor_pos() {
+        let tmp_cur = await joplin.commands.execute('editor.execCommand', {
+            name: 'cm-getCursorPos' 
+        });
+        return tmp_cur;
+    }
+    // 初始化光标位置
+    try{
+        cursor_pos = await get_cursor_pos();
+    }
+    catch(err){
+        // 获取光标位置失败，与编辑器版本有关。
+        console.warn('Error: cm-getCursorPos:', err);
+        await on_animation_error();
+    }
     //
     // head and tail
     const HEAD_TAIL_N_CNT = 1  
@@ -200,26 +238,59 @@ export async function llmReplyStream({
     const CHAT_TAIL = '**End of response**';
     // 打印 CHAT_HEAD
     const print_head = async () => {
-        await insertContentToNote(`\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_N_CNT));
+        await insert_content_move_view(`\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_N_CNT), false);
     }
     const print_tail = async () => {
-        await insertContentToNote('\n'.repeat(HEAD_TAIL_N_CNT) + `${CHAT_TAIL}\n\n`);
+        await insert_content_move_view('\n'.repeat(HEAD_TAIL_N_CNT) + `${CHAT_TAIL}\n\n`, false);
     }
     //
     // 文字动效参数
     const ANIMATION_INTERVAL_MS = 120;
     //
     // ===============================================================
-    // 实时更新笔记中的回复
     // 
-    let result_whole = ''
-    // const insertContentToNote = async (new_text: string) => {
-    //     result_whole += new_text; // 将新内容拼接到结果中
-    //     await joplin.commands.execute('insertText', new_text); // 插入最新内容到笔记
-    // };
-    async function insertContentToNote (new_text: string) {
-        result_whole += new_text; // 将新内容拼接到结果中
-        await joplin.commands.execute('insertText', new_text); // 插入最新内容到笔记
+    /**
+     * 实时更新笔记中的回复，
+     * 依赖外部变量: result_whole, cursor_pos
+     * @param new_text 
+     * @param need_save 
+     * @returns 
+     */
+    async function insert_content_move_view (new_text: string, need_save_text = true) {
+        // 如果笔记切换了，强制退出
+        let current_note = await joplin.workspace.selectedNote();
+        if (current_note.id != START_NOTE.id){
+            // alert('ERROR: ' + dictText['err_note_changed'])
+            await on_animation_error();
+            throw new Error('Note changed error!')
+        }
+        // 跳转到上次的光标位置
+        try{
+            let last_pos = cursor_pos.startLine.from + cursor_pos.startPosition.column;
+            await joplin.commands.execute('editor.execCommand', {
+                name: 'cm-moveCursorPosition',
+                args: [last_pos]
+            });
+        }
+        catch(e){
+            console.log(`Error = ${e}`)
+        }
+        //
+        // 将新内容拼接到结果中
+        if (need_save_text){
+            result_whole += new_text;
+        }
+        //
+        // 插入最新内容到笔记
+        await joplin.commands.execute('insertText', new_text); 
+        //
+        // 滚动
+        await scroll_to_view(scroll_type);
+        //
+        // 保存最新光标位置
+        cursor_pos = await joplin.commands.execute('editor.execCommand', {
+            name: 'cm-getCursorPos' 
+        });
     };
     //
     // 光标移动到选区最末尾
@@ -232,6 +303,11 @@ export async function llmReplyStream({
     // ===============================================================
     // 构造对话列表
     let prompt_messages = [];
+    // 补充当前的时间
+    const ADD_CURRENT_TIME = true;
+    if (ADD_CURRENT_TIME){
+        prompt_messages.push({ role: 'system', content: `Current time: ${formatNow()}` });
+    }
     // 如果有传入的，直接使用
     if (lst_msg.length>0){ 
         prompt_messages = lst_msg;
@@ -263,7 +339,7 @@ export async function llmReplyStream({
     //
     // ===============================================================
     // waiting 动效
-    const show_waiting = Number(llmSettingValues['llmWaitAnimation']) === 1;
+    const show_waiting = true; 
     // const waitingAnimator = new TextProgressAnimator(ANIMATION_INTERVAL_MS, show_waiting, 'Waiting'); 
     const waitingAnimator = new FloatProgressAnimator('notellm_waiting_anim', show_waiting, FLOATING_HTML_WAITING); 
     //
@@ -304,8 +380,8 @@ export async function llmReplyStream({
     // ============= ================= ==============
     // 主要流程开始
     // 
+    // 进入之后，立刻开始 wait 环节；
     try {
-        // 进入之后，立刻开始 wait 环节；
         await on_wait_start();
     }
     catch {
@@ -378,12 +454,7 @@ export async function llmReplyStream({
      * @param tool_name 
      */
     async function on_tool_call_start(tool_name:string){
-        // await joplin.commands.execute('editor.execCommand', {
-        //     name: 'cm-tempFloatingObject',
-        //     args: [{ text: `Calling ${tool_name}, please wait.`, 
-        //         floatId: String(2500+(Date.now()%500)), ms: 2000, bgColor: COLOR_FLOAT_SETTING }]
-        // });
-        let mcp_text = `Calling ${tool_name}, please wait...`
+        let mcp_text = `[${MCP_MODE}] Calling ${tool_name}, please wait...`
         await joplin.commands.execute('editor.execCommand', {
             name: 'cm-addFloatingObject',
             args: [{ text: makeJumpingHtml(mcp_text), 
@@ -408,27 +479,6 @@ export async function llmReplyStream({
     }
     catch(err){
         console.warn('JSON parse failed:', err);
-    }
-    //
-    // 光标位置
-    let cursor_pos:any;  
-    /**
-     * 获取光标的位置
-     * @returns 
-     */
-    const get_cursor_pos = async () => {
-        let tmp_cur = await joplin.commands.execute('editor.execCommand', {
-            name: 'cm-getCursorPos' 
-        });
-        return tmp_cur;
-    }
-    try{
-        cursor_pos = await get_cursor_pos();
-    }
-    catch(err){
-        // 获取光标位置失败，与编辑器版本有关。
-        console.warn('cm-getCursorPos:', err);
-        await on_animation_error();
     }
     //
     // 发起 HTTP 请求
@@ -474,32 +524,24 @@ export async function llmReplyStream({
         // 此处暂时没有需要做的
     }
     //
-    // 解析流式响应
-    const reader = llm_response.body.getReader();
-    const decoder = new TextDecoder('utf-8');
-    //
-    // 逐块读取流式数据
+    // 输出解析部分
     let output_str = '';
     let need_add_head = true;
     let fail_count = 0
     const FAIL_COUNT_MAX = 3
-    //
-    let reply_type = 'unknown';  // 本次请求的类型划分
-    //
+    let reply_type = 'unknown';  // 本次请求的类型划分（是否调用工具）
     let is_stream_done = false;
     let lst_tool_calls = [];
-    //
-    let start_note = await joplin.workspace.selectedNote(); // 启动时的笔记
     let force_stop = false;  // 强制退出
     //
-    // 输出解析部分
-    //
     try{  
+        const reader = llm_response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
         while (!is_stream_done) {
             //
             // 切换笔记后退出
             let current_note = await joplin.workspace.selectedNote();
-            if (current_note.id != start_note.id){
+            if (current_note.id != START_NOTE.id){
                 alert('ERROR: ' + dictText['err_note_changed'])
                 await on_animation_error();
                 return;  
@@ -596,8 +638,19 @@ export async function llmReplyStream({
                                         continue;
                                     }
                                 }
+                                else if (new_content.trim().startsWith('<think>')) {
+                                    // 特例：工具调用等情况下，直接将完整版发来了，也属于这种情况
+                                    const endIndex = new_content.indexOf('</think>');
+                                    if (endIndex !== -1){
+                                        if (hide_thinking){
+                                            new_content = new_content.trim().replace(/^<think>[\s\S]*?<\/think>\n\n/, '');
+                                            thinking_status = 'think_finished';
+                                        }
+                                    }
+                                }
                                 else{
                                     // 如果不是 <think> 开头，说明不是推理模式，直接跳过
+                                    // 特例：工具调用等情况下，直接将完整版发来了，也属于这种情况
                                     thinking_status = 'think_finished';
                                 }
                             }
@@ -624,53 +677,32 @@ export async function llmReplyStream({
                                     }
                                 }
                             }
+                            else if (thinking_status === 'think_finished') {
+                                // 思考已经结束，会进入这里
+                            }
                             //
                             output_str += new_content;
-                            // 还原光标位置，避免意外移动光标后输入到错误的位置
-                            try{
-                                let last_pos = cursor_pos.startLine.from + cursor_pos.startPosition.column;
-                                await joplin.commands.execute('editor.execCommand', {
-                                    name: 'cm-moveCursorPosition',
-                                    args: [last_pos]
-                                });
-                            }
-                            catch{
-                                //
-                            }
                             //
                             // 避免大模型又输出一次 head。这个逻辑比较落后，之后可以考虑删除
                             if(need_add_head){
                                 if (output_str.length>10 && !output_str.trim().startsWith('**')){  // 肯定不是重复出现
-                                    await insertContentToNote(output_str);
+                                    await insert_content_move_view(output_str);
                                     need_add_head = false;
                                 }
                                 else if(output_str.length>(5 + `**${CHAT_HEAD}**`.length) ){
                                     if(output_str.trim().startsWith(`**${CHAT_HEAD}**`)){  // 
                                         output_str = output_str.replace(`**${CHAT_HEAD}**`,''); // 避免重复出现
-                                        await insertContentToNote(output_str);
+                                        await insert_content_move_view(output_str);
                                     }
                                     else{
-                                        await insertContentToNote(output_str);
+                                        await insert_content_move_view(output_str);
                                     }
                                     need_add_head = false;
                                 }
                                 fail_count = 0;
                             }
                             else{
-                                await insertContentToNote(new_content); // 实时更新内容
-                            }
-                            // 滚动条移动到光标位置
-                            await scroll_to_view(scroll_type);
-                            //
-                            // 存储光标位置，避免意外移动光标后输入到错误的位置
-                            try{
-                                cursor_pos = await joplin.commands.execute('editor.execCommand', {
-                                    name: 'cm-getCursorPos' 
-                                });
-                                // console.log('cursor_pos = ',cursor_pos);
-                            }
-                            catch(err){
-                                console.warn('cm-getCursorPos:', err);
+                                await insert_content_move_view(new_content); // 实时更新内容
                             }
                         }
                     } catch (err) {
@@ -686,27 +718,29 @@ export async function llmReplyStream({
         //
         // 大模型回复完成，执行收尾工作 ================= ================ ===============
         //
-        if (reply_type == 'content') { // 文本回复模式
+        if (reply_type == 'content') { // 收尾类型：文本回复模式
             try{
                 // 万一总长度不足导致上面没有执行；
                 if (need_add_head){ 
-                    await insertContentToNote(output_str);
+                    await insert_content_move_view(output_str);
                 }
                 // 防止大模型抽风，重复输出手动设定的结束语。
                 if (output_str.trim().endsWith(CHAT_TAIL)){  
-                    await insertContentToNote('\n\n');
+                    await insert_content_move_view('\n\n');
                 }
                 else{  // 正常情况，由程序输出结束语
-                    // await insertContentToNote('\n'.repeat(HEAD_TAIL_N_CNT) + `${CHAT_TAIL}\n\n`);
                     await print_tail();
                 }
-                //
-                await scroll_to_view(scroll_type);
                 //
                 // 显示完成提示
                 await joplin.commands.execute('editor.execCommand', {
                     name: 'cm-tempFloatingObject',
-                    args: [{ text: `Finished.`, floatId:String(2500+(Date.now()%500)), ms:2000, bgColor: COLOR_FLOAT_FINISH}]
+                    args: [{ 
+                        text: `Finished.`, 
+                        floatId: String(2500+(Date.now()%500)), 
+                        ms: 2000, 
+                        bgColor: COLOR_FLOAT_FINISH
+                    }]
                 });
             }
             catch(err){
@@ -714,7 +748,7 @@ export async function llmReplyStream({
             }
         }
         //
-        else if (reply_type == 'tool_calls') {  // 工具调用模式
+        else if (reply_type == 'tool_calls') {  // 收尾类型：工具调用模式
             //
             console.log('lst_tool_calls = ', lst_tool_calls);
             //
