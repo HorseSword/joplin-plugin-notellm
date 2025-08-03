@@ -282,7 +282,7 @@ export async function registerSettings(): Promise<void> {
         type: SettingItemType.String,
         value: '',
         label: 'URL for MCP Server (Preview)',
-        description: 'e.g. http://127.0.0.1:18080.',
+        description: 'e.g. http://127.0.0.1:7302. The source code for the mcp server is open source at https://github.com/horsesword/notellm_mcp_server .',
         section: 'notellm.settings',
         public: true,
         advanced: true,

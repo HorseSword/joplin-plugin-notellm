@@ -22,6 +22,8 @@ It's completely open-source and does not collect any logs or personal informatio
     - You can tell LLM how to improve it.
 - **Question & Answer**: 
     - Ask LLM about selected texts.
+- **MCP Supported (preview)**:
+    - You can call MCP tools by using [NoteLLM_MCP_Server](https://github.com/HorseSword/notellm_mcp_server).  
 
 ## Mobile Support
 
@@ -77,6 +79,7 @@ And, in the top menu under Tools / NoteLLM, find quick access to all functions. 
 
 # Update Logs
 
+- v0.6.0 (preview), 2025-08-03. MCP available, find more at [NoteLLM_MCP_Server](https://github.com/HorseSword/notellm_mcp_server).
 - v0.5.2, 2025-07-12. Optimized waiting and thinking animation effects.
 - v0.5.1, 2025-07-09. (1) Optimized lots of animation effects. (2) New toast (removed old toast because of it's bug).
 - v0.5.0, 2025-07-08. Significantly adjusted the waiting animation, and optimized the code logic.
