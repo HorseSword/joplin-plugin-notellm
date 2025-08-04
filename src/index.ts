@@ -315,7 +315,7 @@ joplin.plugins.register({
 		// 添加一个菜单项到顶部“工具”菜单中
 		await joplin.views.menus.create(
 			'askLLM_menus', // 菜单项 ID
-			'Note_LLM', // 菜单项名称
+			'NoteLLM', // 菜单项名称
 			[
 			  {
 				label: 'askLLM_Chat',

@@ -66,9 +66,9 @@ Currently, this plugin support OpenAI-API (including OpenAI compatibility APIs).
 
 
 
-![image-20250211191521564](./_img/image-20250211191521564.png)
+Then, you will have access to several features. First, a chat icon appears at the top of the markdown editing interface. Clicking on it triggers a conversation with AI based on all preceding content up to your cursor position.
 
-Then you will have access to several features. First, a chat icon appears at the top of the markdown editing interface. Clicking on it triggers a conversation with AI based on all preceding content up to your cursor position.
+You can also stop generation by click this button again (>= v0.6.1).
 
 ![image-20250211190649811](./_img/image-20250211190649811.png)
 
@@ -76,9 +76,26 @@ And, in the top menu under Tools / NoteLLM, find quick access to all functions. 
 
 ![image-20250211190753843](./_img/image-20250211190753843.png)
 
+### MCP support (preview)
+
+Run [NoteLLM_MCP_Server](https://github.com/HorseSword/notellm_mcp_server) to support MCP tools.
+
+![image-20250804202012197](./_img/image-20250804202012197.png)
+
+Then, go to settings of [NoteLLM](https://github.com/HorseSword/joplin-plugin-notellm) >= v0.6.0,
+
+(1) Find "Advanced settings", and fill "URL for MCP Server (Preview)" part.
+
+(2) Change "MCP for LLM (preview)" from "OFF" to "MCP (tool call)" below LLM1 to LLM3. 
+
+**Reminder: Your model must support "tool call"**.
+
+
+
 
 # Update Logs
 
+- v0.6.1 (preview), 2025-08-04. (1) Bug fixed. (2) You can stop generation by click "Chat" button.
 - v0.6.0 (preview), 2025-08-03. MCP available, find more at [NoteLLM_MCP_Server](https://github.com/HorseSword/notellm_mcp_server).
 - v0.5.2, 2025-07-12. Optimized waiting and thinking animation effects.
 - v0.5.1, 2025-07-09. (1) Optimized lots of animation effects. (2) New toast (removed old toast because of it's bug).

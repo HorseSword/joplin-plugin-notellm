@@ -398,7 +398,7 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                     floatingEl.style.borderRadius = '60px';
                     floatingEl.style.fontFamily = 'sans-serif';
                     floatingEl.style.fontSize = '14px';
-                    floatingEl.style.transition = 'all 200ms ease';
+                    floatingEl.style.transition = 'right 200ms ease, bottom 5ms ease, opacity 200ms ease';
                     floatingEl.style.minWidth = '120px';
                     
                     // 只用于显示，不允许任何操作交互，避免干扰
@@ -407,6 +407,10 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                     
                     // 将其添加到主文档的 body 中，而不是编辑器内部
                     document.body.appendChild(floatingEl);
+
+                    floatingEl.addEventListener('click', function(){
+                        remove_floating_object(floatId)
+                    });
 
                 }
                 

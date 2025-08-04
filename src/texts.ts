@@ -11,8 +11,8 @@ export function getTxt(lan='en') {
     //
     dictText['summary_label'] = isZH?'生成摘要（无选中时基于光标前文，有选中时基于选中区域）':'Summarize (above cursor or selection)'
     dictText['chat_label'] = isZH?'聊天（无选中时基于光标前文，有选中时基于选中区域）':'Chat (above cursor or selection)';
-    dictText['ask_label'] = isZH?'提问选中区域':'Ask about selection'
-    dictText['improve_label'] = isZH?'改写选中区域（结合上下文）':'Rewrite selection (based on before and after)'
+    dictText['ask_label'] = isZH?'提问（针对选中区域）':'Ask about selection'
+    dictText['improve_label'] = isZH?'结合上下文改写（针对选中区域）':'Rewrite selection (based on before and after)'
     //
     // settings
     dictText['select_llm_label']= isZH?'选择 LLM':'LLM select'

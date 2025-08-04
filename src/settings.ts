@@ -286,7 +286,22 @@ export async function registerSettings(): Promise<void> {
         section: 'notellm.settings',
         public: true,
         advanced: true,
-      }
+      },
+      //
+      llmFlagLlmRunning: { 
+        type: SettingItemType.Int,
+        value: 0,
+        label: 'llm_running', 
+        description: 'llm_running', 
+        section: 'notellm.settings',
+        public: false,
+        advanced: false,
+        isEnum:true,
+        options: {
+          1: 'ON',
+          0: 'OFF',
+        }
+      },
     });
 }
 
