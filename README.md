@@ -95,6 +95,7 @@ Then, go to settings of [NoteLLM](https://github.com/HorseSword/joplin-plugin-no
 
 # Update Logs
 
+- v0.6.2, 2025-08-04. (1) Animation bug fixed. (2) New "Stop" button to stop LLM's generation.
 - v0.6.1 (preview), 2025-08-04. (1) Bug fixed. (2) You can stop generation by click "Chat" button.
 - v0.6.0 (preview), 2025-08-03. MCP available, find more at [NoteLLM_MCP_Server](https://github.com/HorseSword/notellm_mcp_server).
 - v0.5.2, 2025-07-12. Optimized waiting and thinking animation effects.

@@ -11,7 +11,7 @@ export async function registerSettings(): Promise<void> {
     let dictText = getTxt(locale);
     //
     await joplin.settings.registerSection('notellm.settings', {
-      label: 'LLM settings',
+      label: 'NoteLLM',
       iconName: pluginIconName(),
     });
   

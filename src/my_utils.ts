@@ -183,23 +183,23 @@ export async function llmReplyStream({
     let apiModel = '', apiUrl = '', apiKey = '', extraConfig:any;
     let mcp_number = 0;
     if(llmSelect==2){
-        apiModel = String(llmSettingValues['llmModel2']);
+        apiModel = String(llmSettingValues['llmModel2']).trim();
         apiUrl = String(llmSettingValues['llmServerUrl2']) + '/chat/completions';
-        apiKey = String(llmSettingValues['llmKey2']);
+        apiKey = String(llmSettingValues['llmKey2']).trim();
         extraConfig = String(llmSettingValues['llmExtra2']);
         mcp_number = Number(llmSettingValues['llmMcp2']);
     }
     else if(llmSelect==3){
-        apiModel = String(llmSettingValues['llmModel3']);
+        apiModel = String(llmSettingValues['llmModel3']).trim();
         apiUrl = String(llmSettingValues['llmServerUrl3']) + '/chat/completions';
-        apiKey = String(llmSettingValues['llmKey3']);
+        apiKey = String(llmSettingValues['llmKey3']).trim();
         extraConfig = String(llmSettingValues['llmExtra3']);
         mcp_number = Number(llmSettingValues['llmMcp3']);
     }
     else{
-        apiModel = String(llmSettingValues['llmModel']);
+        apiModel = String(llmSettingValues['llmModel']).trim();
         apiUrl = String(llmSettingValues['llmServerUrl']) + '/chat/completions';
-        apiKey = String(llmSettingValues['llmKey']);
+        apiKey = String(llmSettingValues['llmKey']).trim();
         extraConfig = String(llmSettingValues['llmExtra']);
         mcp_number = Number(llmSettingValues['llmMcp']);
     }
@@ -535,13 +535,13 @@ export async function llmReplyStream({
         if (!llm_response.ok || !llm_response.body) {
             const errorText = await llm_response.text();
             console.error('Error from LLM API:', errorText);
-            alert(`ERROR 156: ${llm_response.status} ${llm_response.statusText}`);
+            alert(`ERROR 156: ${llm_response.status} ${llm_response.statusText} ${errorText}`);
             await on_before_return();
+            await on_animation_error();
             return;
         }
     }
     catch(err){  
-        await on_animation_error();
         //
         // 网络错误，或者CORS限制。此时得到的response是空对象。
         if (err.message.includes('Failed to fetch')){
@@ -553,6 +553,7 @@ export async function llmReplyStream({
             alert(`ERROR 177: ${err} \n llm_response = ${llm_response}.`);
         }
         await on_before_return();
+        await on_animation_error();
         return;
     }   
     finally{
@@ -950,6 +951,36 @@ export async function llmReplyStream({
             //
         }
         await on_before_return();
+    }
+}
+
+/**
+ * 手动停止
+ */
+export async function llmReplyStop() {
+    //
+    const locale = await joplin.settings.globalValue('locale');
+    let dictText = getTxt(locale);
+    // flags
+    let llmSettingFlags = await joplin.settings.values(['llmFlagLlmRunning'])
+    let is_running = parseInt(String(llmSettingFlags['llmFlagLlmRunning']));
+    //
+    if (is_running == 1){ // 正在运行，强行停止
+        await joplin.settings.setValue('llmFlagLlmRunning', 0);
+        // alert('Force stopped!')
+        await joplin.commands.execute('editor.execCommand', {
+            name: 'cm-tempFloatingObject',
+            args: [{ text: `NoteLLM force stoped!`, 
+                floatId: 'llm_stop_1', ms: 3000, bgColor: COLOR_FLOAT_WARNING }]
+        });
+        return;
+    }
+    else { // 并没有运行
+        await joplin.commands.execute('editor.execCommand', {
+            name: 'cm-tempFloatingObject',
+            args: [{ text: `NoteLLM stoped.`, 
+                floatId: 'llm_stop_0', ms: 3000, bgColor: COLOR_FLOAT_FINISH }]
+        });
     }
 }
 

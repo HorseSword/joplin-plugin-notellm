@@ -1,7 +1,7 @@
 import joplin from 'api';
 import {ToolbarButtonLocation, ContentScriptType, MenuItemLocation } from 'api/types';
 import {registerSettings, pluginIconName } from './settings';
-import {llmReplyStream, changeLLM} from './my_utils';
+import {llmReplyStream, llmReplyStop, changeLLM} from './my_utils';
 import {getTxt} from './texts';
 
 
@@ -227,20 +227,25 @@ joplin.plugins.register({
 						//
 						let prompt_messages = []
 						prompt_messages.push({ role: 'system', content: dictText['prompt_ask_1']});
+						//
+						// before selection
 						if (dict_selection.str_before.length>0){
 							prompt_messages.push({role:'user',content:`<text_before_selection>\n\n${dict_selection.str_before}\n\n</text_before_selection>`});
 						}
 						//
+						// selection
 						prompt_messages.push({ role: 'user', content: `<text_selected>\n\n${dict_selection.str_selected}\n\n</text_selected>`});
 						let str_command = result_of_question.formData.question.desc;
 						prompt_messages.push({role:'user',content:`<user_command>\n\n${str_command}\n\n</user_command>`});
 						//
+						// after selection
 						if (dict_selection.str_after.length>0){
 							prompt_messages.push({role:'user',content:`<text_after_selection>\n\n${dict_selection.str_after}\n\n</text_after_selection>`});
 						}
 						prompt_messages.push({ role: 'user', 
 							content: dictText['prompt_ask_2']
 						});
+						//
 						await llmReplyStream({inp_str:dict_selection.str_selected,
 							query_type:'ask',
 							is_selection_exists:true,
@@ -310,6 +315,14 @@ joplin.plugins.register({
 			}
 		})
 		//
+		await joplin.commands.register({
+			name: 'askLLMStop',
+			label: 'Stop LLM output.',
+			iconName: 'fas fa-comment-slash',
+			execute: async () => {
+				await llmReplyStop();
+			}
+		})
 		// 
 		//
 		// 添加一个菜单项到顶部“工具”菜单中
@@ -369,6 +382,11 @@ joplin.plugins.register({
         await joplin.views.toolbarButtons.create(
             'askLLMChat_ToolBarButton', // 按钮 ID
             'askLLMChat',   // 绑定的命令名称
+            ToolbarButtonLocation.EditorToolbar // 工具栏位置（支持移动端）
+        );
+		await joplin.views.toolbarButtons.create(
+            'askLLMStop_ToolBarButton', // 按钮 ID
+            'askLLMStop',   // 绑定的命令名称
             ToolbarButtonLocation.EditorToolbar // 工具栏位置（支持移动端）
         );
 		//
