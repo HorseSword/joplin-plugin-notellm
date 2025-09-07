@@ -114,7 +114,8 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
             codeMirrorWrapper.registerCommand("cm-replaceRange", (fromPos:number, toPos:number, newStr:string) => {
                 replaceRange(fromPos, toPos, newStr);
             });
-
+            //
+            //
             /**
              * 移动光标位置
              * 
@@ -129,7 +130,72 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
             codeMirrorWrapper.registerCommand("cm-moveCursorPosition", (position) => {
                 moveCursorPosition(position);
             });
+            //
+            //
+            /**
+             * 光标是否在显示范围内
+             */
+            function isCursorInView() {
+                const view: EditorView = codeMirrorWrapper.editor;  // CodeMirror6 
+                const sel = view.state.selection.main;
+                const pos = sel.head; // 主光标位置
 
+                const caret = view.coordsAtPos(pos);
+                if (!caret) return false; // 位置不可见（例如被折叠、未渲染）
+
+                // caret 是一个矩形（包含 top/bottom/left/right）
+                const caretRect = {
+                    top: caret.top,
+                    bottom: caret.bottom,
+                    left: caret.left,
+                    right: caret.right
+                };
+
+                const viewportRect = view.scrollDOM.getBoundingClientRect();
+
+                const verticallyVisible =
+                    caretRect.bottom > viewportRect.top && caretRect.top < viewportRect.bottom;
+                const horizontallyVisible =
+                    caretRect.right > viewportRect.left && caretRect.left < viewportRect.right;
+
+                return verticallyVisible && horizontallyVisible;
+            }
+            /*
+            用法：
+            await joplin.commands.execute('editor.execCommand', {
+                name: 'cm-isCursorInView' 
+            });
+            */
+            codeMirrorWrapper.registerCommand("cm-isCursorInView", () => {
+                return isCursorInView();
+            });
+            /**
+             * 
+             */
+            function distCursorFromView() {
+                const view: EditorView = codeMirrorWrapper.editor;  // CodeMirror6 
+                const sel = view.state.selection.main;
+                const pos = sel.head; // 主光标位置
+
+                const caret = view.coordsAtPos(pos);
+                if (!caret) return 0; // 位置不可见（例如被折叠、未渲染）
+
+                // caret 是一个矩形（包含 top/bottom/left/right）
+
+                const viewportRect = view.scrollDOM.getBoundingClientRect();
+
+                return viewportRect.bottom - caret.top;
+            }
+            /*
+            用法：
+            await joplin.commands.execute('editor.execCommand', {
+                name: 'cm-distCursorFromView' 
+            });
+            */
+            codeMirrorWrapper.registerCommand("cm-distCursorFromView", () => {
+                return distCursorFromView();
+            });
+            //
             /**
              * 获得当前行
              * 
@@ -167,7 +233,7 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
             });
 
             /**
-             * 输入文本。
+             * 输入文本
              */
             function myInsertText(inp_str:string){
                 const editor = codeMirrorWrapper.editor;

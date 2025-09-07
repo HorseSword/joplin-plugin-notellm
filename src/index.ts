@@ -3,7 +3,7 @@ import {ToolbarButtonLocation, ContentScriptType, MenuItemLocation } from 'api/t
 import {registerSettings, pluginIconName } from './settings';
 import {llmReplyStream, llmReplyStop, changeLLM} from './my_utils';
 import {getTxt} from './texts';
-
+import {mcp_call_tool, mcp_get_tools} from './mcpClient';
 
 joplin.plugins.register({
 	onStart: async function() {
@@ -323,6 +323,25 @@ joplin.plugins.register({
 				await llmReplyStop();
 			}
 		})
+
+		await joplin.commands.register({
+			name: 'mcp_call_tool',
+			label: 'mcp_call_tool',
+			iconName: 'fas fa-comment-slash',
+			execute: async (mcp_url, tool_name, args={}) => {
+				return await mcp_call_tool(mcp_url, tool_name, args);
+			}
+		})
+
+		await joplin.commands.register({
+			name: 'mcp_get_tools',
+			label: 'mcp_get_tools',
+			iconName: 'fas fa-comment-slash',
+			execute: async (mcp_url) => {
+				return await mcp_get_tools(mcp_url);
+			}
+		})
+		
 		// 
 		//
 		// 添加一个菜单项到顶部“工具”菜单中
