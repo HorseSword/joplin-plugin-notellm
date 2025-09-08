@@ -298,11 +298,12 @@ export async function mcp_get_tools_openai(MCP_SERVER_URL:string) {
   let dict_map = {}
   let n = 0;
   for (let server_url of MCP_SERVER_URL.split("|")){
+    if(server_url.trim().length)
       try{
           n+=1;
           let prefix = 's'+String(n).padStart(2,"0");
           // console.log('line_479, server_url = ',server_url)
-          let tools_of_mcp = await mcp_get_tools(server_url);
+          let tools_of_mcp = await mcp_get_tools(server_url.trim());
           console.log('[INFO_302] tools_of_mcp =',tools_of_mcp)
           let lst_tools = []
           // 如果返回是列表的话，再处理一次
@@ -327,7 +328,7 @@ export async function mcp_get_tools_openai(MCP_SERVER_URL:string) {
               lst_tools_openai.push(tool_openai_one)
               dict_map[prefix + '_' + tool_mcp_one.name] = {
                 "function_name": tool_mcp_one.name,
-                "server_url": server_url
+                "server_url": server_url.trim()
               }
           } 
       }

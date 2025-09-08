@@ -134,7 +134,8 @@ export async function llmReplyStream({
         str_before='', 
         str_after='',
         lst_tools_input = [],
-        round_tool_call = 0
+        round_tool_call = 0,
+        flags = null
     }) {
     //
     const locale = await joplin.settings.globalValue('locale');
@@ -176,7 +177,7 @@ export async function llmReplyStream({
         'llmSelect',
         'llmTemperature', 'llmMaxTokens', 'llmScrollType',
         'llmChatType', 'llmChatSkipThink', 'llmChatPrompt', 
-        'llmMcpServer'
+        // 'llmMcpServer'
     ]);
     // 基础参数
     let llmSelect = parseInt(String(llmSettingValues['llmSelect']));  // 模型入口序号
@@ -229,7 +230,33 @@ export async function llmReplyStream({
     let prompt_for_chat = String(llmSettingValues['llmChatPrompt']);
     //
     // MCP 相关的参数
-    const MCP_SERVER = String(llmSettingValues['llmMcpServer']);
+    const lst_mcp_setting_keys = ['llmMcpEnabled'];
+    for (let n = 1; n <= 42; n++){
+        let n_mcp = String(n).padStart(2,"0");
+        lst_mcp_setting_keys.push('llmMcpEnabled_'+n_mcp)
+        lst_mcp_setting_keys.push('llmMcpServer_'+n_mcp)
+    }
+    const dict_mcp_settings = await joplin.settings.values(lst_mcp_setting_keys);
+    let mcp_servers_str = '';
+    if(Number(dict_mcp_settings['llmMcpEnabled'])>0) { // 总开关
+        for (let n = 1; n <= 42; n++){
+            let n_mcp = String(n).padStart(2,"0");
+            if(dict_mcp_settings['llmMcpEnabled_'+n_mcp]){ // 如果启用
+                let mcp_server_one = String(dict_mcp_settings['llmMcpServer_'+n_mcp]);
+                if(mcp_server_one.trim().length>0){
+                    if(mcp_servers_str.length<=0){
+                        mcp_servers_str = mcp_server_one;
+                    }
+                    else{
+                        mcp_servers_str = mcp_servers_str + '|' + mcp_server_one
+                    } 
+                } 
+            }
+        }
+    }
+    // const MCP_SERVER = String(llmSettingValues['llmMcpServer']); // 读取设置
+    const MCP_SERVER = mcp_servers_str;
+    //
     let IS_MCP_ENABLED = (mcp_number > 0 && MCP_SERVER.trim().length > 0);
     let MCP_MODE = 'mcp'  // agent, mcp, null
     if (mcp_number == 10){
@@ -238,7 +265,9 @@ export async function llmReplyStream({
     else if (mcp_number == 20){
         MCP_MODE = 'agent'
     }
-    const MAX_TOOL_CALL_ROUND = 5 // 不允许 MCP 的循环调用次数过多
+    const MAX_TOOL_CALL_ROUND = 3 // 不允许 MCP 的循环调用次数过多
+    //
+    //////
     //
     const START_NOTE = await joplin.workspace.selectedNote(); // 启动时的笔记
     // 
@@ -260,6 +289,12 @@ export async function llmReplyStream({
     const HEAD_TAIL_N_CNT = 2
     const CHAT_HEAD = `Response from ${apiModel}:`;  // 不需要加粗
     const CHAT_TAIL = '**End of response**';
+    if (flags === null){
+        flags = {
+            head_printed:false,
+            tail_printed:false
+        }
+    }
     // 打印 CHAT_HEAD
     const print_head = async () => {
         await insert_content_move_view(`\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_N_CNT), false);
@@ -303,7 +338,10 @@ export async function llmReplyStream({
         // 逻辑（待验证）：首次输出之前，先输出开头 TODO
         if (new_text.length>0){ // 不需要 trim，因为空格或换行也是输出
             if (result_whole.length<=0){
-                await joplin.commands.execute('insertText', `\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_N_CNT));
+                if(!flags.head_printed){
+                    await joplin.commands.execute('insertText', `\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_N_CNT));
+                    flags.head_printed = true;
+                }
             }
             // 插入最新内容到笔记
             await joplin.commands.execute('insertText', new_text); 
@@ -478,36 +516,6 @@ export async function llmReplyStream({
             });
         return openai_tools;
     }
-
-    async function mcp_get_tools_http(MCP_SERVER_URL:string) {
-        // 
-        let tools_of_openai = [];
-        for (let server_url of MCP_SERVER_URL.split("|")){
-            try{
-                console.log('line_479, server_url = ',server_url)
-                let tools_of_mcp = await mcp_get_tools(server_url);
-                console.log('line_480, tools_of_mcp =',tools_of_mcp)
-                for (let tool_mcp of tools_of_mcp[0].result.tools){  // 为什么加 [0] 很神奇
-                    console.log('line_482 = ',tool_mcp)
-                    let tool_in_openai = { 
-                        type:'function', 
-                        function: {
-                            name: tool_mcp.name,
-                            description: tool_mcp.description,
-                            parameters: tool_mcp.inputSchema
-                        }
-                    };
-                    console.log('tool_in_openai = ', tool_in_openai)
-                    tools_of_openai.push(tool_in_openai)
-                } 
-            }
-            catch{
-                continue;
-            }
-        }
-        console.log('tools_of_openai = ',tools_of_openai)
-        return {tools: tools_of_openai};
-    }
     //
     let openai_tools:any;
     let openai_map:any
@@ -518,16 +526,10 @@ export async function llmReplyStream({
             requestBody['tools'] = lst_tools_input;
             requestBody['temperature'] = 0;
         }
-        else {  // 通过API获取可用工具的列表
-            
-            if(false){
-                openai_tools = await mcp_get_tools_restful(MCP_SERVER_URL);
-                //
-            }
-            else{
-                openai_tools = await mcp_get_tools_openai(MCP_SERVER);
-                openai_map = openai_tools['tmap'];
-            }
+        else {  // 获取可用工具的列表
+            openai_tools = await mcp_get_tools_openai(MCP_SERVER);
+            openai_map = openai_tools['tmap'];
+            //
             if (openai_tools['tools'].length > 0) {  // 还需要更多的格式验证
                 requestBody['tools'] = openai_tools['tools'];
             }
@@ -827,7 +829,6 @@ export async function llmReplyStream({
         //
         // 大模型回复完成，执行收尾工作 ================= ================ ===============
         //
-        let tail_printed =  false;
         if (reply_type == 'content') { // 收尾类型：文本回复模式
             try{
                 // 万一总长度不足导致上面没有执行；
@@ -837,10 +838,11 @@ export async function llmReplyStream({
                 // 防止大模型抽风，重复输出手动设定的结束语。
                 if (output_str.trim().endsWith(CHAT_TAIL)){  
                     await insert_content_move_view('\n\n');
+                    flags.tail_printed = true;
                 }
                 else{  // 正常情况，由程序输出结束语
                     await print_tail();
-                    tail_printed = true;
+                    flags.tail_printed = true;
                 }
                 //
                 // 显示完成提示
@@ -1018,7 +1020,8 @@ export async function llmReplyStream({
                     inp_str : 'null', 
                     lst_msg : prompt_messages, 
                     round_tool_call: round_tool_call + 1,
-                    lst_tools_input: second_list_tool
+                    lst_tools_input: second_list_tool,
+                    flags: flags
                 });
             }
             else {  // 普通的工具调用，是真的要执行功能的
@@ -1032,17 +1035,19 @@ export async function llmReplyStream({
                 await llmReplyStream({
                     inp_str : 'null', 
                     lst_msg : prompt_messages_with_tool_result, 
-                    round_tool_call: round_tool_call + 1
+                    round_tool_call: round_tool_call + 1,
+                    flags: flags
                 });
             }
         }
-        if (tail_printed){
+        // 尾巴输出
+        if (flags.tail_printed){
             // 尾巴输出过，就不再输出了
         }
         else{
             if (result_whole.trim().length>0){
                 await print_tail();
-                tail_printed = true;
+                flags.tail_printed = true;
             }
         }
     }
@@ -1203,12 +1208,13 @@ export function splitText(raw:string, remove_think:boolean=true) {
     // const cleanResult = result.filter(item => item.content.trim() !== '');
 
     // 移除 <think> </think> 部分 
-    // TODO 当前对多段思考不兼容，需要进一步修正
+    // TODO 正文如果出现 <think> </think>，可能会存在 bug，不过严格来说并不影响显示，所以先观察试试
     if(remove_think && result.length > 0){
         for (let i = 0; i < result.length; i++) {
             if (result[i].role === "assistant"){
                 let content = result[i].content;
-                let content_without_think = content.trim().replace(/^<think>[\s\S]*?<\/think>/, '').trimStart();
+                // let content_without_think = content.trim().replace(/^<think>[\s\S]*?<\/think>/, '').trimStart();  // 只处理第一个
+                let content_without_think = content.trim().replace(/<think>[\s\S]*?<\/think>/g, '').trimStart();  // g 代表全替换
                 result[i].content = content_without_think;
             } 
             else{
