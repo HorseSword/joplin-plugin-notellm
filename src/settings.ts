@@ -318,7 +318,7 @@ export async function registerSettings(): Promise<void> {
         type: SettingItemType.Int,
         value: 10,
         label: 'Main switch for MCP', 
-        description: 'Turn ON to enable MCP, or turn OFF to disable all. \nSupport MCP servers that are compatible with streamableHTTP mode and SSE mode. \n Reminder: STDIO is NOT supported for now, but you can load stdio MCP tools with "Local_MCP_Manager" and convert them to streamableHTTP mode for invocation. For details, see https://github.com/horsesword/local_mcp_manager', 
+        description: 'Turn ON to enable MCP, or turn OFF to disable all. \n\n Support streamableHTTP MCP servers. \n\n Reminder: STDIO and SSE are NOT supported for now, but you can load them with other tools like "Local_MCP_Manager" and convert them to streamableHTTP mode for invocation. For details, see https://github.com/horsesword/local_mcp_manager', 
         section: 'notellm.mcp',
         public: true,
         advanced: false,
@@ -359,7 +359,7 @@ export async function registerSettings(): Promise<void> {
       if(n<=1){
         // dict_settings['llmMcpEnabled_'+n_mcp]['description'] = '';
         dict_settings['llmMcpReminder_'+n_mcp]['description'] = 'For noting the name of the MCP. Just name it!';
-        dict_settings['llmMcpServer_'+n_mcp]['description'] = 'Support streamableHTTP MCP servers (and some SSE servers). e.g. http://127.0.0.1:17001/mcp, https://api.githubcopilot.com/mcp/, or https://mcp.map.baidu.com/mcp?ak=xxx'
+        dict_settings['llmMcpServer_'+n_mcp]['description'] = 'Support streamableHTTP MCP servers. e.g. http://127.0.0.1:17001/mcp, https://api.githubcopilot.com/mcp/, or https://mcp.map.baidu.com/mcp?ak=xxx'
       }
       else{
         // dict_settings['llmMcpReminder_'+n_mcp]['description'] = 'Just name it.';

@@ -1,7 +1,10 @@
 # Joplin Plugin: NoteLLM
 
 Your very own AI-powered note plugin for Joplin. 
+
 It's completely open-source and does not collect any logs or personal information.
+
+New: MCP supported.
 
 ![notellm](./_img/notellm.gif)
 
@@ -22,8 +25,8 @@ It's completely open-source and does not collect any logs or personal informatio
     - You can tell LLM how to improve it.
 - **Question & Answer**: 
     - Ask LLM about selected texts.
-- **MCP Supported (preview)**:
-    - You can call MCP tools by using [NoteLLM_MCP_Server](https://github.com/HorseSword/notellm_mcp_server).  
+- **MCP Supported**:
+    - You can use streamableHTTP MCP tools in your note.  
 
 ## Mobile Support
 
@@ -32,7 +35,7 @@ Currently, mobile users can enjoy the chat functionality over the entire note te
 Others functions are under development.
 
 **Known problems on mobile app**:
-- On mobile app, some LLM servers may not function properly due to CORS restrictions. It is known that ollama has this issue; you can try configuring a proxy to resolve it. This is restricted by framework and I can not fix it now.
+- On mobile app, some LLM servers may not function properly due to **CORS restrictions**. It is known that ollama and MCP have this issue on mobile; you can try configuring a proxy to resolve it. This is **restricted by Joplin framework** and I can not fix it now.
 - Sometimes, when you click on a plugin icon, there is no response. Killing the app's background process and restarting the app usually resolves this issue. The cause may be related to Joplin's background management, though I am unable to pinpoint the exact problem at this time.
 
 # Usage Instructions
@@ -76,28 +79,35 @@ And, in the top menu under Tools / NoteLLM, find quick access to all functions. 
 
 ![image-20250211190753843](./_img/image-20250211190753843.png)
 
-### MCP support (preview)
+## MCP support !!!
 
-Run [NoteLLM_MCP_Server](https://github.com/HorseSword/notellm_mcp_server) to support MCP tools.
+MCP functionality has been completely upgraded and restructured, now directly supporting streamableHTTP MCP.
 
-![image-20250804202012197](./_img/image-20250804202012197.png)
+In version v0.7.0 or above, MCP settings can be found in session "NoteLLM MCP". In which you can configure at most 42 MCP servers, and toggle them as you like.
 
-Then, go to settings of [NoteLLM](https://github.com/HorseSword/joplin-plugin-notellm) >= v0.6.0,
+![image-20250909205331103](./_img/image-20250909205331103.png)
 
-(1) Find "Advanced settings", and fill "URL for MCP Server (Preview)" part.
+Here you can add streamableHTTP MCP servers.
 
-(2) Change "MCP for LLM (preview)" from "OFF" to "MCP (tool call)" below LLM1 to LLM3. 
+![image-20250909205548746](./_img/image-20250909205548746.png)
 
-**Reminder: Your model must support "tool call"**.
+
+
+After changing "MCP for LLM (preview)" from "OFF" to "MCP (tool call)" below LLM1, LLM2 and LLM3, you can use MCP tools in your note now. 
+
+**Reminder: LLM must support "tool call"**.
+
+**Reminder**: STDIO and SSE are NOT supported for now, but you can load them with other tools like "Local_MCP_Manager" and convert them to streamableHTTP mode for invocation. For details, see https://github.com/horsesword/local_mcp_manager
 
 
 
 
 # Update Logs
 
+- v0.7.0, 2025-09-09. MCP functionality has been completely upgraded and restructured, now directly supporting streamableHTTP MCP.
 - v0.6.2, 2025-08-04. (1) Animation bug fixed. (2) New "Stop" button to stop LLM's generation.
 - v0.6.1 (preview), 2025-08-04. (1) Bug fixed. (2) You can stop generation by click "Chat" button.
-- v0.6.0 (preview), 2025-08-03. MCP available, find more at [NoteLLM_MCP_Server](https://github.com/HorseSword/notellm_mcp_server).
+- v0.6.0 (preview), 2025-08-03. MCP available.
 - v0.5.2, 2025-07-12. Optimized waiting and thinking animation effects.
 - v0.5.1, 2025-07-09. (1) Optimized lots of animation effects. (2) New toast (removed old toast because of it's bug).
 - v0.5.0, 2025-07-08. Significantly adjusted the waiting animation, and optimized the code logic.
