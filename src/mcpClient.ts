@@ -372,3 +372,14 @@ export async function mcp_call_tool(mcp_url:string, tool_name:string, args:any={
     await client.close();
   }
 }
+
+export function get_mcp_prompt(){
+  // 
+  let prompt_for_mcp = `
+  Before answering user's question, you can use one or more tools. Then user will give you the result of your tool call. 
+  Use necessary tools step-by-step to accomplish user's query, with result of the previous tool use.
+  If no tool call is needed, you should answer the question directly.
+  Never re-use a tool call that you previously used with same parameters.
+  `
+  return prompt_for_mcp;
+}

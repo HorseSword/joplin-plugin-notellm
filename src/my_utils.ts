@@ -5,7 +5,7 @@ import { FLOATING_HTML_BASIC, FLOATING_HTML_THINKING, FLOATING_HTML_WAITING,
     makeJumpingHtml,
     FloatProgressAnimator
  } from './pluginFloatingObject';
-import {mcp_call_tool, mcp_get_tools, mcp_get_tools_openai} from './mcpClient';
+import {mcp_call_tool, mcp_get_tools, mcp_get_tools_openai, get_mcp_prompt} from './mcpClient';
 
 const COLOR_FLOAT_FINISH = '#3bba9c'  // 绿色
 const COLOR_FLOAT_SETTING = '#535f80'  // 蓝灰提示
@@ -402,7 +402,14 @@ export async function llmReplyStream({
                 prompt_head = prompt_for_chat.trim();
             }           
         }
-        prompt_messages.push({ role: 'system', content: prompt_head});
+        prompt_messages.push({role: 'system', content: prompt_head});
+        //
+        if (IS_MCP_ENABLED){
+            // 也许下面 MCP 判断条件可以往前放。
+            prompt_messages.push({role: 'system', content: get_mcp_prompt()});
+        }
+        prompt_messages.push({role: 'system', content: 'Response in user query language.'})
+        //
         if(query_type === 'chat' && chatType == 1){
             let lstSplited = splitText(inp_str);
             prompt_messages = prompt_messages.concat(lstSplited);
@@ -1028,7 +1035,8 @@ export async function llmReplyStream({
                 let prompt_messages_with_tool_result = [
                     ...prompt_messages, 
                     // {'role':'system','content':`tool_call result: ${JSON.stringify(lst_tool_result)}`}
-                    {'role':'system','content':`<tool_result> ${lst_tool_result} </tool_result> Do not use same tool for too many times.`}
+                    // {'role':'system','content':`<tool_result> ${lst_tool_result} </tool_result> Do not use same tool for too many times.`}
+                    {'role':'user','content':`<tool_result> ${lst_tool_result} </tool_result>`}
                 ];
                 console.log('prompt_messages_with_tool_result = ', prompt_messages_with_tool_result);
                 //

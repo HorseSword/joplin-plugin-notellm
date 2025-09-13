@@ -20,9 +20,9 @@ New: MCP supported.
 - **Summarization**: 
     - **If no selection**: Summarize **all above cursor**.
     - **If any texts are selected**: Summarize selected text portions efficiently. 
-- **Improve your selection**: 
-    - Improve the expression of selected text. This will consider context before and after selection. 
-    - You can tell LLM how to improve it.
+- **Rewrite your selection**: 
+    - Rewrite selected text. This will consider context before and after selection. 
+    - You can tell LLM how to rewrite it.
 - **Question & Answer**: 
     - Ask LLM about selected texts.
 - **MCP Supported**:
@@ -104,6 +104,7 @@ After changing "MCP for LLM (preview)" from "OFF" to "MCP (tool call)" below LLM
 
 # Update Logs
 
+- v0.7.1, 2025-09-13. Better prompt for MCP calling.
 - v0.7.0, 2025-09-09. MCP functionality has been completely upgraded and restructured, now directly supporting streamableHTTP MCP.
 - v0.6.2, 2025-08-04. (1) Animation bug fixed. (2) New "Stop" button to stop LLM's generation.
 - v0.6.1 (preview), 2025-08-04. (1) Bug fixed. (2) You can stop generation by click "Chat" button.
