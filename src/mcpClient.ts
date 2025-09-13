@@ -379,6 +379,7 @@ export function get_mcp_prompt(){
   Before answering user's question, you can use one or more tools. Then user will give you the result of your tool call. 
   Use necessary tools step-by-step to accomplish user's query, with result of the previous tool use.
   If no tool call is needed, you should answer the question directly.
+  For hard questions, you can answer step by step.
   Never re-use a tool call that you previously used with same parameters.
   `
   return prompt_for_mcp;

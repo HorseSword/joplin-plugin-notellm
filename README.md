@@ -132,3 +132,7 @@ After changing "MCP for LLM (preview)" from "OFF" to "MCP (tool call)" below LLM
 # Thank you!
 
 NoteLLM is designed to enhance your note-taking experience with powerful AI capabilities while ensuring privacy and customization.
+
+# License
+
+This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE) file for details.
