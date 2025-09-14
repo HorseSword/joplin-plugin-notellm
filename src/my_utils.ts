@@ -1,16 +1,12 @@
 // import { getCurves } from 'crypto';  // I think, this is useless. Why here?
 import joplin from '../api';
 import {getTxt} from './texts';
-import { FLOATING_HTML_BASIC, FLOATING_HTML_THINKING, FLOATING_HTML_WAITING, 
-    makeJumpingHtml,
-    FloatProgressAnimator
+import { 
+    FLOATING_HTML_BASIC, FLOATING_HTML_THINKING, FLOATING_HTML_WAITING, 
+    COLOR_FLOAT, makeJumpingHtml, FloatProgressAnimator
  } from './pluginFloatingObject';
 import {mcp_call_tool, mcp_get_tools, mcp_get_tools_openai, get_mcp_prompt} from './mcpClient';
 
-const COLOR_FLOAT_FINISH = '#3bba9c'  // 绿色
-const COLOR_FLOAT_SETTING = '#535f80'  // 蓝灰提示
-const COLOR_FLOAT_NORMAL = '#388087' // 青绿色
-const COLOR_FLOAT_WARNING = '#e67235'  // 橙色警告
 /**
  * 对话的消息体类
  */
@@ -231,24 +227,26 @@ export async function llmReplyStream({
     //
     // MCP 相关的参数
     const lst_mcp_setting_keys = ['llmMcpEnabled'];
-    for (let n = 1; n <= 42; n++){
+    const N_MAP_MAX = 42
+    for (let n = 1; n <= N_MAP_MAX; n++){
         let n_mcp = String(n).padStart(2,"0");
         lst_mcp_setting_keys.push('llmMcpEnabled_'+n_mcp)
         lst_mcp_setting_keys.push('llmMcpServer_'+n_mcp)
     }
-    const dict_mcp_settings = await joplin.settings.values(lst_mcp_setting_keys);
-    let mcp_servers_str = '';
-    if(Number(dict_mcp_settings['llmMcpEnabled'])>0) { // 总开关
-        for (let n = 1; n <= 42; n++){
+    const dict_mcp_settings = await joplin.settings.values(lst_mcp_setting_keys);  // 读取设置项
+    //
+    let mcp_servers_str = ''; // MCP服务器网址拼接的字符串
+    if(Number(dict_mcp_settings['llmMcpEnabled'])>0) { // MCP总开关
+        for (let n = 1; n <= N_MAP_MAX; n++){
             let n_mcp = String(n).padStart(2,"0");
             if(dict_mcp_settings['llmMcpEnabled_'+n_mcp]){ // 如果启用
                 let mcp_server_one = String(dict_mcp_settings['llmMcpServer_'+n_mcp]);
                 if(mcp_server_one.trim().length>0){
                     if(mcp_servers_str.length<=0){
-                        mcp_servers_str = mcp_server_one;
+                        mcp_servers_str = mcp_server_one.trim();
                     }
                     else{
-                        mcp_servers_str = mcp_servers_str + '|' + mcp_server_one
+                        mcp_servers_str = mcp_servers_str + '|' + mcp_server_one.trim();
                     } 
                 } 
             }
@@ -256,8 +254,23 @@ export async function llmReplyStream({
     }
     // const MCP_SERVER = String(llmSettingValues['llmMcpServer']); // 读取设置
     const MCP_SERVER = mcp_servers_str;
+    const MAX_TOOL_CALL_ROUND = 3; // 不允许 MCP 的循环调用次数过多
     //
     let IS_MCP_ENABLED = (mcp_number > 0 && MCP_SERVER.trim().length > 0);
+    if (IS_MCP_ENABLED) {
+        // 服务器是否可用
+        /*
+        let is_mcp_server_available = await checkServerStatus(MCP_SERVER);
+        if (is_mcp_server_available.status != 'online') {
+            console.info('MCP server unavailable')
+            IS_MCP_ENABLED = false;
+        }
+        */
+        // 轮数是否过多
+        if (round_tool_call > MAX_TOOL_CALL_ROUND) {
+            IS_MCP_ENABLED = false;
+        }
+    }
     let MCP_MODE = 'mcp'  // agent, mcp, null
     if (mcp_number == 10){
         MCP_MODE = 'mcp'
@@ -265,7 +278,6 @@ export async function llmReplyStream({
     else if (mcp_number == 20){
         MCP_MODE = 'agent'
     }
-    const MAX_TOOL_CALL_ROUND = 3 // 不允许 MCP 的循环调用次数过多
     //
     //////
     //
@@ -379,16 +391,16 @@ export async function llmReplyStream({
     // ===============================================================
     // 构造对话列表
     let prompt_messages = [];
-    // 补充当前的时间
-    const ADD_CURRENT_TIME = true;
-    if (ADD_CURRENT_TIME){
-        prompt_messages.push({ role: 'system', content: `<current_time> ${formatNow()} </current_time>`});
-    }
     // 如果有传入的，直接使用
     if (lst_msg.length>0){ 
         prompt_messages = lst_msg;
     }
     else{
+        // 补充当前的时间
+        const ADD_CURRENT_TIME = true;
+        if (ADD_CURRENT_TIME){
+            prompt_messages.push({ role: 'system', content: `<current_time> ${formatNow()} </current_time>`});
+        }
         // 基础参数
         let chatType = parseInt(String(llmSettingValues['llmChatType']));
         let prompt_head = 'You are a helpful assistant.';
@@ -404,14 +416,15 @@ export async function llmReplyStream({
         }
         prompt_messages.push({role: 'system', content: prompt_head});
         //
-        if (IS_MCP_ENABLED){
-            // 也许下面 MCP 判断条件可以往前放。
+        // MCP prompt
+        
+        if (IS_MCP_ENABLED){ // 也许下面 MCP 判断条件可以往前放。
             prompt_messages.push({role: 'system', content: get_mcp_prompt()});
         }
         prompt_messages.push({role: 'system', content: 'Response in user query language.'})
         //
         if(query_type === 'chat' && chatType == 1){
-            let lstSplited = splitText(inp_str);
+            let lstSplited = splitTextToMessages(inp_str);
             prompt_messages = prompt_messages.concat(lstSplited);
             console.log(prompt_messages);
         }
@@ -429,7 +442,7 @@ export async function llmReplyStream({
     // think 动效
     const hide_thinking = Number(llmSettingValues['llmChatSkipThink']) === 1;
     // const thinkingAnimator = new TextProgressAnimator(ANIMATION_INTERVAL_MS, hide_thinking, 'Thinking'); 
-    const thinkingAnimator = new FloatProgressAnimator('notellm_thinking_anim', hide_thinking, FLOATING_HTML_THINKING, COLOR_FLOAT_NORMAL); 
+    const thinkingAnimator = new FloatProgressAnimator('notellm_thinking_anim', hide_thinking, FLOATING_HTML_THINKING, COLOR_FLOAT.NORMAL); 
     let thinking_status = 'not_started';
     //
     // 开始等待
@@ -483,29 +496,15 @@ export async function llmReplyStream({
     // ============= ================= ==============
     // 工具 MCP
     //
-    let MCP_SERVER_URL = '';
+    let MCP_SERVER_URL_RESTFUL = '';
     if (MCP_MODE == 'mcp'){
-        MCP_SERVER_URL = MCP_SERVER + '/mcp/get_tools'
+        MCP_SERVER_URL_RESTFUL = MCP_SERVER + '/mcp/get_tools'
     }
     else if (MCP_MODE == 'agent'){
-        MCP_SERVER_URL = MCP_SERVER + '/mcp/get_agents'
+        MCP_SERVER_URL_RESTFUL = MCP_SERVER + '/mcp/get_agents'
     }
-    if (IS_MCP_ENABLED) {
-        // 服务器是否可用
-        /*
-        let is_mcp_server_available = await checkServerStatus(MCP_SERVER);
-        if (is_mcp_server_available.status != 'online') {
-            console.info('MCP server unavailable')
-            IS_MCP_ENABLED = false;
-        }
-        */
-        // 轮数是否过多
-        if (round_tool_call > MAX_TOOL_CALL_ROUND) {
-            IS_MCP_ENABLED = false;
-        }
-    }
-    async function mcp_get_tools_restful(MCP_SERVER_URL:string) {
-        let openai_tools = await fetch(MCP_SERVER_URL)
+    async function mcp_get_tools_restful(MCP_SERVER_URL_RESTFUL:string) {
+        let openai_tools = await fetch(MCP_SERVER_URL_RESTFUL)
             .then(mcp_response => {
                 if (!mcp_response.ok) {
                 throw new Error('MCP_网络响应失败');
@@ -543,18 +542,24 @@ export async function llmReplyStream({
         }
     }
     /**
-     * 纯显示，无实际作用。
+     * 纯显示 toast，无实际作用。
      * 
      * 调用工具时，显示工具名称
      * @param tool_name 
      */
-    async function on_tool_call_start(tool_name:string){
-        let mcp_text = `[${MCP_MODE}] Calling ${tool_name}, please wait...`
+    async function on_tool_call_start(tool_name:string, server_name:string=''){
+        let mcp_text = `[${MCP_MODE}]`
+        if(server_name.trim().length > 0){
+            mcp_text += `Calling ${server_name}.${tool_name}, please wait...`
+        } 
+        else{
+            mcp_text += `Calling ${tool_name}, please wait...`
+        }
         await joplin.commands.execute('editor.execCommand', {
             name: 'cm-addFloatingObject',
             args: [{ text: makeJumpingHtml(mcp_text), 
                 floatId: 'on_tool_call_start', 
-                bgColor: COLOR_FLOAT_NORMAL }]
+                bgColor: COLOR_FLOAT.NORMAL }]
         });
     }
     async function on_tool_call_end(tool_name:string) {
@@ -859,7 +864,7 @@ export async function llmReplyStream({
                         text: `Finished.`, 
                         floatId: String(2500+(Date.now()%500)), 
                         ms: 2000, 
-                        bgColor: COLOR_FLOAT_FINISH
+                        bgColor: COLOR_FLOAT.FINISH
                     }]
                 });
             }
@@ -905,12 +910,10 @@ export async function llmReplyStream({
                 let tool_result_one:any;  // 运行结果
                 tool_name_cache = tool_call_one.function.name;
                 try {
-                    let MCP_RUN_URL = '';
                     let tool_call_name = ''
                     let json_body:string;
-                    MCP_RUN_URL = MCP_SERVER + '/mcp/call_tool'
                     //
-                    // 显示
+                    // 显示 toast
                     if (MCP_MODE == 'agent'){
                         tool_call_name = 'call_agents';  // 其实可以不写，但某些模型智力不够，避免弄错可以强制指定
                         // if ("agent_id" in tool_call_one.function.arguments){
@@ -935,6 +938,8 @@ export async function llmReplyStream({
                     //
                     // 执行工具调用
                     if(false){
+                        let MCP_RUN_URL = '';
+                        MCP_RUN_URL = MCP_SERVER + '/mcp/call_tool'
                         json_body = JSON.stringify({
                             name: tool_call_name,
                             arguments: tool_call_one.function.arguments
@@ -985,7 +990,7 @@ export async function llmReplyStream({
                         else{
                             tool_result_one = result_one.result.content[0].text 
                         }
-                        tool_result_one = `<name>${tool_call_name}</name>  <args>${tool_call_args_json}</args>  <result>${tool_result_one}</result>`
+                        tool_result_one = `<name>${tool_call_name}</name>\n<args>${tool_call_args_json}</args>\n<result>${tool_result_one}</result>`
                     }
                     //
                     // 将响应结果保存到变量 a
@@ -1099,7 +1104,7 @@ export async function llmReplyStop() {
         await joplin.commands.execute('editor.execCommand', {
             name: 'cm-tempFloatingObject',
             args: [{ text: `NoteLLM force stoped!`, 
-                floatId: 'llm_stop_1', ms: 3000, bgColor: COLOR_FLOAT_WARNING }]
+                floatId: 'llm_stop_1', ms: 3000, bgColor: COLOR_FLOAT.WARNING }]
         });
         return;
     }
@@ -1107,7 +1112,7 @@ export async function llmReplyStop() {
         await joplin.commands.execute('editor.execCommand', {
             name: 'cm-tempFloatingObject',
             args: [{ text: `NoteLLM stoped.`, 
-                floatId: 'llm_stop_0', ms: 3000, bgColor: COLOR_FLOAT_FINISH }]
+                floatId: 'llm_stop_0', ms: 3000, bgColor: COLOR_FLOAT.FINISH }]
         });
     }
 }
@@ -1148,7 +1153,7 @@ export async function changeLLM(llm_no=0) {
     await joplin.commands.execute('editor.execCommand', {
         name: 'cm-tempFloatingObject',
         args: [{ text: `LLM ${int_target_llm} selected!`, 
-            floatId: String(2500+(Date.now()%500)), ms: 2000, bgColor: COLOR_FLOAT_SETTING }]
+            floatId: String(2500+(Date.now()%500)), ms: 2000, bgColor: COLOR_FLOAT.SETTING }]
     });
 }
 
@@ -1156,7 +1161,7 @@ export async function changeLLM(llm_no=0) {
  * For chat only. 
  * Split long text to dialog list, including role and content.
  */
-export function splitText(raw:string, remove_think:boolean=true) {
+export function splitTextToMessages(raw:string, remove_think:boolean=true) {
 
     const lines = raw.split(/\r?\n/);
     // let remove_think = true;

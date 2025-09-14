@@ -5,11 +5,19 @@ import joplin from '../api';
  */
 
 const FLOATING_OBJECT_ID = 'notellm-floating-object';
-const FLOATING_OBJECT_BG = '#4d53b3'; // 深蓝  // 'rgba(10, 100, 200, 0.9)';
-const COLOR_FLOAT_FINISH = '#3bba9c'  // 绿色
-const COLOR_FLOAT_SETTING = '#535f80'  // 蓝灰提示
-const COLOR_FLOAT_NORMAL = '#388087' // 青绿色
-const COLOR_FLOAT_WARNING = '#e67235'  // 橙色警告
+export const FLOATING_OBJECT_BG = '#4d53b3'; // 深蓝  // 'rgba(10, 100, 200, 0.9)';
+export const COLOR_FLOAT_FINISH = '#3bba9c'  // 绿色
+export const COLOR_FLOAT_SETTING = '#535f80'  // 蓝灰提示
+export const COLOR_FLOAT_NORMAL = '#388087' // 青绿色
+export const COLOR_FLOAT_WARNING = '#e67235'  // 橙色警告
+
+export const COLOR_FLOAT = {
+    BG: FLOATING_OBJECT_BG,
+    FINISH: COLOR_FLOAT_FINISH,
+    SETTING: COLOR_FLOAT_SETTING,
+    NORMAL: COLOR_FLOAT_NORMAL,
+    WARNING: COLOR_FLOAT_WARNING
+}
 
 export function add_floating_object (text: string, floatId:string, 
     bgColor:string = FLOATING_OBJECT_BG) {
