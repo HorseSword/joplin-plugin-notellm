@@ -1197,7 +1197,8 @@ export async function changeLLM(llm_no=0) {
         else {
             // 测试连接
             try {
-                let check = await testChatCompletion(apiUrl,apiKey,apiModel);
+                // let check = await testChatCompletion(apiUrl, apiKey, apiModel);
+                let check = await testListModels(apiUrl, apiKey);
                 if (check.available){
                     test_result = 'OK'
                 }
@@ -1225,41 +1226,74 @@ export async function changeLLM(llm_no=0) {
     }
 }
 
+async function testListModels(baseURL, apiKey) {
+    try {
+        let fixedURL= baseURL.replace("/v1/chat/completions", '/v1/models')
+        const response = await fetch(`${fixedURL}`, {
+            headers: { 'Authorization': `Bearer ${apiKey}` }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            return {
+                available: true,
+                response: data.choices?.[0]?.message?.content || 'OK',
+                usage: data.usage
+            };
+        }
+        else {
+            const errorData = await response.json().catch(() => ({}));
+            return {
+                available: false,
+                error: errorData.error?.message || `HTTP ${response.status}`,
+                status: response.status
+            };
+        }
+    } 
+    catch (error) {
+        return {
+            available: false,
+            error: error.message
+        };
+    }
+};
+
 async function testChatCompletion(baseURL:string, apiKey:string, model:string) {
   try {
-    const response = await fetch(`${baseURL}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [{ role: 'user', content: 'Hi' }],
-        max_tokens: 5
-      })
-    });
-    if (response.ok) {
-      const data = await response.json();
-      return {
-        available: true,
-        response: data.choices?.[0]?.message?.content || 'OK',
-        usage: data.usage
-      };
-    } else {
-      const errorData = await response.json().catch(() => ({}));
-      return {
-        available: false,
-        error: errorData.error?.message || `HTTP ${response.status}`,
-        status: response.status
-      };
+        const response = await fetch(`${baseURL}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: [{ role: 'user', content: 'Hi' }],
+                max_tokens: 5
+            })
+        });
+        if (response.ok) {
+            const data = await response.json();
+            return {
+                available: true,
+                response: data.choices?.[0]?.message?.content || 'OK',
+                usage: data.usage
+            };
+        } 
+        else {
+            const errorData = await response.json().catch(() => ({}));
+            return {
+                available: false,
+                error: errorData.error?.message || `HTTP ${response.status}`,
+                status: response.status
+            };
+        }
+    } 
+    catch (error) {
+        return {
+            available: false,
+            error: error.message
+        };
     }
-  } catch (error) {
-    return {
-      available: false,
-      error: error.message
-    };
-  }
 }
 
 /**
