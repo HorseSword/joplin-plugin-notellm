@@ -1155,6 +1155,111 @@ export async function changeLLM(llm_no=0) {
         args: [{ text: `LLM ${int_target_llm} selected!`, 
             floatId: String(2500+(Date.now()%500)), ms: 2000, bgColor: COLOR_FLOAT.SETTING }]
     });
+    //
+    // test llm connection
+    let TEST_LLM_CONNECTION = true;
+    let test_result = 'OK';
+    if (TEST_LLM_CONNECTION) {
+        //
+        const llmSettingValues = await joplin.settings.values([
+        'llmModel','llmServerUrl','llmKey', 'llmExtra', 'llmMcp',
+        'llmModel2','llmServerUrl2','llmKey2','llmExtra2','llmMcp2',
+        'llmModel3','llmServerUrl3','llmKey3','llmExtra3','llmMcp3',]);
+        //
+        // 基础参数
+        //
+        let apiModel = '', apiUrl = '', apiKey = '', extraConfig:any;
+        if(int_target_llm==2){
+            apiModel = String(llmSettingValues['llmModel2']).trim();
+            apiUrl = String(llmSettingValues['llmServerUrl2']) + '/chat/completions';
+            apiKey = String(llmSettingValues['llmKey2']).trim();
+        }
+        else if(int_target_llm==3){
+            apiModel = String(llmSettingValues['llmModel3']).trim();
+            apiUrl = String(llmSettingValues['llmServerUrl3']) + '/chat/completions';
+            apiKey = String(llmSettingValues['llmKey3']).trim();
+        }
+        else{
+            apiModel = String(llmSettingValues['llmModel']).trim();
+            apiUrl = String(llmSettingValues['llmServerUrl']) + '/chat/completions';
+            apiKey = String(llmSettingValues['llmKey']).trim();
+        }
+        // 如果关键参数缺失，直接报错，不需要走后面的流程
+        if (apiModel.trim() === ''){
+            test_result = 'Model Name is Empty?';
+        } 
+        else if(apiUrl.trim() === ''){
+            test_result = 'Model URL is Empty?';
+        }
+        else if(apiKey.trim() === '') {
+            test_result = 'Model Key is Empty?';
+        }
+        else {
+            // 测试连接
+            try {
+                let check = await testChatCompletion(apiUrl,apiKey,apiModel);
+                if (check.available){
+                    test_result = 'OK'
+                }
+                else{
+                    test_result = check.error;
+                }
+            } catch {
+                test_result = 'Connection_Error';
+            }
+        };
+        if (test_result == 'OK'){
+            await joplin.commands.execute('editor.execCommand', {
+                name: 'cm-tempFloatingObject',
+                args: [{ text: `LLM ${int_target_llm} Status: OK`, 
+                    floatId: String(2500+(Date.now()%500)), ms: 2000, bgColor: COLOR_FLOAT.FINISH }]
+            });
+        }
+        else {
+            await joplin.commands.execute('editor.execCommand', {
+                name: 'cm-tempFloatingObject',
+                args: [{ text: `LLM ${int_target_llm} Error: ${test_result}`, 
+                    floatId: String(2500+(Date.now()%500)), ms: 3500, bgColor: COLOR_FLOAT.WARNING }]
+            });
+        }
+    }
+}
+
+async function testChatCompletion(baseURL:string, apiKey:string, model:string) {
+  try {
+    const response = await fetch(`${baseURL}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [{ role: 'user', content: 'Hi' }],
+        max_tokens: 5
+      })
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        available: true,
+        response: data.choices?.[0]?.message?.content || 'OK',
+        usage: data.usage
+      };
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        available: false,
+        error: errorData.error?.message || `HTTP ${response.status}`,
+        status: response.status
+      };
+    }
+  } catch (error) {
+    return {
+      available: false,
+      error: error.message
+    };
+  }
 }
 
 /**

@@ -244,6 +244,7 @@ export async function registerSettings(): Promise<void> {
           // 20: 'Agent'
         }
       },
+      //
       // 高级选项
       //
       llmTemperature: { // Temperature
