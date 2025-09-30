@@ -586,7 +586,7 @@ export async function llmReplyStream({
     try{
         let dict_headers = {
             'User-Agent': 'NoteLLM',
-            'X-Client-Name':'NoteLLM',
+            // 'X-Client-Name':'NoteLLM', // 这行可能导致 gemini 屏蔽，所以先不要添加
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`, // 设置 API 密钥
         }

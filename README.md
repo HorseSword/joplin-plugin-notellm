@@ -104,6 +104,7 @@ After changing "MCP for LLM (preview)" from "OFF" to "MCP (tool call)" below LLM
 
 # Update Logs
 
+- v0.7.3, 2025-09-30. Fixed a bug for calling Google Gemini.
 - v0.7.2, 2025-09-27. New feature: Automatically check availability after switching models through the menu.
 - v0.7.1, 2025-09-13. Better prompt for MCP calling.
 - v0.7.0, 2025-09-09. MCP functionality has been completely upgraded and restructured, now directly supporting streamableHTTP MCP.

@@ -1,6 +1,6 @@
 {
   "name": "joplin-plugin-notellm",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "scripts": {
     "dist": "webpack --env joplin-plugin-config=buildMain && webpack --env joplin-plugin-config=buildExtraScripts && webpack --env joplin-plugin-config=createArchive",
     "prepare": "npm run dist",
