@@ -1,5 +1,7 @@
 # Joplin Plugin: NoteLLM
 
+[中文文档](README_CN.md)
+
 Your very own AI-powered note plugin for Joplin. 
 
 It's completely open-source and does not collect any logs or personal information.
