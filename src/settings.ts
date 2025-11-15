@@ -111,6 +111,16 @@ export async function registerSettings(): Promise<void> {
         advanced: false,
         secure: true, // 密码输入框
       },
+      llmKeyBak: {
+        type: SettingItemType.String,
+        value: '',
+        label: 'LLM 1 key bak',
+        description: 'API-key bak for LLM 1.',
+        section: 'notellm.settings',
+        public: false,
+        advanced: false,
+        secure: false, 
+      },
       llmExtra: {
         type: SettingItemType.String,
         value: '',
@@ -164,6 +174,16 @@ export async function registerSettings(): Promise<void> {
         public: true,
         advanced: true,
         secure: true, // 密码输入框
+      },
+      llmKeyBak2: {
+        type: SettingItemType.String,
+        value: '',
+        label: 'LLM 2 key bak',
+        description: 'API-key bak for LLM 2.',
+        section: 'notellm.settings',
+        public: false,
+        advanced: false,
+        secure: false, 
       },
       llmExtra2: {
         type: SettingItemType.String,
@@ -219,6 +239,16 @@ export async function registerSettings(): Promise<void> {
         public: true,
         advanced: true,
         secure: true, // 密码输入框
+      },
+      llmKeyBak3: {
+        type: SettingItemType.String,
+        value: '',
+        label: 'LLM 3 key bak',
+        description: 'API-key bak for LLM 3.',
+        section: 'notellm.settings',
+        public: false,
+        advanced: false,
+        secure: false, 
       },
       llmExtra3: {
         type: SettingItemType.String,

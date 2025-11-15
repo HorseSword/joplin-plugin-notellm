@@ -118,6 +118,131 @@ function sleep_ms(ms:number) {
 }
 //
 /**
+ * API key backup 的内部实现，避免循环依赖
+ * @param llmSelect
+ * @param llmSettingValues
+ */
+async function _backup_apikey_internal(llmSelect:number, llmSettingValues:any) {
+    let sKey = '', sKeyBak = '';
+
+    if (llmSelect==2){
+        sKey = 'llmKey2'; sKeyBak = 'llmKeyBak2';
+    }
+    else if (llmSelect==3){
+        sKey = 'llmKey3'; sKeyBak = 'llmKeyBak3';
+    }
+    else {
+        sKey = 'llmKey'; sKeyBak = 'llmKeyBak';
+    }
+
+    let apiKey = String(llmSettingValues[sKey]).trim();
+
+    // key may disappear after updating, so backup it.
+    if(apiKey.length<=0){
+        // read backup
+        let apiKeyBak = String(llmSettingValues[sKeyBak]).trim();
+        if(apiKeyBak.length>0){
+            apiKey = apiKeyBak;
+            await joplin.settings.setValue(sKey, apiKey);  
+        }
+    }
+    else{ // if apiKey.length > 0
+        // write backup
+        await joplin.settings.setValue(sKeyBak, apiKey);  
+    }
+    return apiKey;
+}
+
+/**
+ * 用于读取大语言模型的设置参数，并以字典的形式返回。
+ * 通过这种方式，解耦模型参数读取与模型调用过程。
+ *
+ * @returns
+ */
+async function get_llm_options() {
+    // 读取设置的参数
+    const llmSettingValues = await joplin.settings.values([
+        'llmModel','llmServerUrl','llmKey', 'llmKeyBak','llmExtra', 'llmMcp',
+        'llmModel2','llmServerUrl2','llmKey2','llmKeyBak2','llmExtra2','llmMcp2',
+        'llmModel3','llmServerUrl3','llmKey3','llmKeyBak3','llmExtra3','llmMcp3',
+        'llmSelect',
+        'llmTemperature', 'llmMaxTokens', 'llmScrollType',
+        'llmChatType', 'llmChatSkipThink', 'llmChatPrompt',
+        // 'llmMcpServer'
+    ]);
+    let dict_llm = {}
+    // 基础参数
+    let llmSelect = parseInt(String(llmSettingValues['llmSelect']));  // 模型入口序号
+    let sModel = '', sUrl = '', sKey = '', sKeyBak = '', sExtra = '', sMcp = '';
+    //
+    if (llmSelect==2){
+        sModel = 'llmModel2'; sUrl = 'llmServerUrl2'; sKey = 'llmKey2';
+        sKeyBak = 'llmKeyBak2'; sExtra = 'llmExtra2'; sMcp = 'llmMcp2';
+    }
+    else if (llmSelect==3){
+        sModel = 'llmModel3'; sUrl = 'llmServerUrl3'; sKey = 'llmKey3';
+        sKeyBak = 'llmKeyBak3'; sExtra = 'llmExtra3'; sMcp = 'llmMcp3';
+    }
+    else {
+        sModel = 'llmModel'; sUrl = 'llmServerUrl'; sKey = 'llmKey';
+        sKeyBak = 'llmKeyBak'; sExtra = 'llmExtra'; sMcp = 'llmMcp';
+    }
+    //
+    dict_llm['llmSelect'] = llmSelect;
+    dict_llm['model'] = String(llmSettingValues[sModel]).trim();
+    // url and fixed urls
+    let input_url = String(llmSettingValues[sUrl])
+    if (input_url.endsWith('/chat/completions')){
+        dict_llm['url'] = input_url;
+    }
+    else if (input_url.endsWith('/')){
+        dict_llm['url'] = input_url + 'chat/completions';
+    }
+    else {
+        dict_llm['url'] = input_url + '/chat/completions';
+    }
+    //
+    dict_llm['extra_config'] = String(llmSettingValues[sExtra]);
+    dict_llm['mcp_number'] = Number(llmSettingValues[sMcp]);
+    //
+    // 添加滚动类型相关参数
+    dict_llm['scrollType'] = parseInt(String(llmSettingValues['llmScrollType']));
+    let scroll_method = 'desktop';
+    if (dict_llm['scrollType']==1) {
+        scroll_method = 'desktop'
+    }
+    else if (dict_llm['scrollType']==2) {
+        scroll_method = 'mobile'
+    }
+    else {
+        scroll_method = 'none'
+    }
+    dict_llm['scroll_method'] = scroll_method;
+    //
+    // 添加聊天相关参数
+    dict_llm['chatType'] = parseInt(String(llmSettingValues['llmChatType']));
+    dict_llm['chatSkipThink'] = Number(llmSettingValues['llmChatSkipThink']);
+    dict_llm['chatPrompt'] = String(llmSettingValues['llmChatPrompt']);
+    //
+    // 添加温度和最大token参数
+    dict_llm['temperature'] = parseFloat(String(llmSettingValues['llmTemperature']));
+    dict_llm['maxTokens'] = parseInt(String(llmSettingValues['llmMaxTokens'])) ;
+    //
+    // 添加原始设置值，用于其他函数
+    dict_llm['sModel'] = sModel;
+    dict_llm['sUrl'] = sUrl;
+    dict_llm['sKey'] = sKey;
+    dict_llm['sKeyBak'] = sKeyBak;
+    dict_llm['sExtra'] = sExtra;
+    dict_llm['sMcp'] = sMcp;
+    dict_llm['allSettingValues'] = llmSettingValues;
+    //
+    // key may disappear after updating, so backup it.
+    dict_llm['key'] = await _backup_apikey_internal(llmSelect, llmSettingValues);
+    //
+    return dict_llm
+}
+/**
  * 流式回复的可调用函数
  * 
  * 这个函数的作用是，根据传入的文本，流式返回结果。
@@ -165,41 +290,34 @@ export async function llmReplyStream({
         }
     }
     // ===============================================================
-    // 读取设置的参数
-    const llmSettingValues = await joplin.settings.values([
-        'llmModel','llmServerUrl','llmKey', 'llmExtra', 'llmMcp',
-        'llmModel2','llmServerUrl2','llmKey2','llmExtra2','llmMcp2',
-        'llmModel3','llmServerUrl3','llmKey3','llmExtra3','llmMcp3',
-        'llmSelect',
-        'llmTemperature', 'llmMaxTokens', 'llmScrollType',
-        'llmChatType', 'llmChatSkipThink', 'llmChatPrompt', 
-        // 'llmMcpServer'
-    ]);
-    // 基础参数
-    let llmSelect = parseInt(String(llmSettingValues['llmSelect']));  // 模型入口序号
-    //
     let apiModel = '', apiUrl = '', apiKey = '', extraConfig:any;
     let mcp_number = 0;
-    if(llmSelect==2){
-        apiModel = String(llmSettingValues['llmModel2']).trim();
-        apiUrl = String(llmSettingValues['llmServerUrl2']) + '/chat/completions';
-        apiKey = String(llmSettingValues['llmKey2']).trim();
-        extraConfig = String(llmSettingValues['llmExtra2']);
-        mcp_number = Number(llmSettingValues['llmMcp2']);
+    let apiTemperature = 0;
+    let apiMaxTokens = 0;
+    let scroll_method = 'desktop';
+    let prompt_for_chat = '';
+    // let llmSettingValues: any = {};
+    let llmSelect = 0;
+    // 使用统一的参数读取函数
+    const dict_llm = await get_llm_options();
+    try{
+        // 提取各个参数
+        apiModel = dict_llm['model'];
+        apiUrl = dict_llm['url'];
+        apiKey = dict_llm['key'];
+        extraConfig = dict_llm['extra_config'];
+        mcp_number = dict_llm['mcp_number'];
+        apiTemperature = dict_llm['temperature'];
+        apiMaxTokens = dict_llm['maxTokens'];
+        scroll_method = dict_llm['scroll_method'];
+        prompt_for_chat = dict_llm['chatPrompt'];
+        // llmSettingValues = dict_llm['allSettingValues'];
+        llmSelect = dict_llm['llmSelect'];
     }
-    else if(llmSelect==3){
-        apiModel = String(llmSettingValues['llmModel3']).trim();
-        apiUrl = String(llmSettingValues['llmServerUrl3']) + '/chat/completions';
-        apiKey = String(llmSettingValues['llmKey3']).trim();
-        extraConfig = String(llmSettingValues['llmExtra3']);
-        mcp_number = Number(llmSettingValues['llmMcp3']);
-    }
-    else{
-        apiModel = String(llmSettingValues['llmModel']).trim();
-        apiUrl = String(llmSettingValues['llmServerUrl']) + '/chat/completions';
-        apiKey = String(llmSettingValues['llmKey']).trim();
-        extraConfig = String(llmSettingValues['llmExtra']);
-        mcp_number = Number(llmSettingValues['llmMcp']);
+    catch(err){
+        alert(`ERROR 210: ${err}`);
+        await on_before_return();
+        return;
     }
     // 如果关键参数缺失，直接报错，不需要走后面的流程
     if (apiModel.trim() === '' || apiUrl.trim() === '' || apiKey.trim() === '') {
@@ -207,23 +325,6 @@ export async function llmReplyStream({
         await on_before_return();
         return;
     }
-    // 高级参数
-    let apiTemperature = parseFloat(String(llmSettingValues['llmTemperature']));
-    let apiMaxTokens = parseInt(String(llmSettingValues['llmMaxTokens'])) ;
-    let llmScrollType = parseInt(String(llmSettingValues['llmScrollType'])) ;
-    //
-    let scroll_method = 'desktop';
-    if (llmScrollType==1) {
-        scroll_method = 'desktop'
-    }
-    else if (llmScrollType==2) {
-        scroll_method = 'mobile'
-    }
-    else {
-        scroll_method = 'none'
-    }
-    // 
-    let prompt_for_chat = String(llmSettingValues['llmChatPrompt']);
     //
     // MCP 相关的参数
     const lst_mcp_setting_keys = ['llmMcpEnabled'];
@@ -402,7 +503,7 @@ export async function llmReplyStream({
             prompt_messages.push({ role: 'system', content: `<current_time> ${formatNow()} </current_time>`});
         }
         // 基础参数
-        let chatType = parseInt(String(llmSettingValues['llmChatType']));
+        let chatType = parseInt(String(dict_llm['chatType']));
         let prompt_head = 'You are a helpful assistant.';
         //
         // Chat message list
@@ -440,7 +541,7 @@ export async function llmReplyStream({
     const waitingAnimator = new FloatProgressAnimator('notellm_waiting_anim', show_waiting, FLOATING_HTML_WAITING); 
     //
     // think 动效
-    const hide_thinking = Number(llmSettingValues['llmChatSkipThink']) === 1;
+    const hide_thinking = Number(dict_llm['chatSkipThink']) === 1;
     // const thinkingAnimator = new TextProgressAnimator(ANIMATION_INTERVAL_MS, hide_thinking, 'Thinking'); 
     const thinkingAnimator = new FloatProgressAnimator('notellm_thinking_anim', hide_thinking, FLOATING_HTML_THINKING, COLOR_FLOAT.NORMAL); 
     let thinking_status = 'not_started';
@@ -1144,50 +1245,68 @@ export async function changeLLM(llm_no=0) {
     // toast for LLM changing
     //
     await joplin.settings.setValue('llmSelect', int_target_llm);
-    // await (joplin.views.dialogs as any).showToast({
-    //     message:`LLM ${int_target_llm} selected!`, 
-    //     duration: 2500+(Date.now()%500), 
-    //     type:'success',
-    //     timestamp: Date.now()
-    // }); 
+    //
+    const dict_llm = await get_llm_options();
+    const apiModel = dict_llm['model'];
+    //
     await joplin.commands.execute('editor.execCommand', {
         name: 'cm-tempFloatingObject',
-        args: [{ text: `LLM ${int_target_llm} selected!`, 
+        args: [{ text: `LLM ${int_target_llm} selected! Model = (${apiModel}) `, 
             floatId: String(2500+(Date.now()%500)), ms: 2000, bgColor: COLOR_FLOAT.SETTING }]
     });
     //
     // test llm connection
     let TEST_LLM_CONNECTION = true;
-    let test_result = 'OK';
     if (TEST_LLM_CONNECTION) {
-        //
+        await check_llm_status();
+    }
+}
+
+/**
+ * API key may disappear after updating, so backup it.
+ * @param llmSelect
+ */
+async function backup_apikey(llmSelect:number) {
+    // 读取设置以获取llmSelect当前值
+    const currentSettings = await joplin.settings.values(['llmSelect']);
+    const currentSelect = parseInt(String(currentSettings['llmSelect']));
+
+    // 临时设置llmSelect为指定值以获取正确的配置
+    await joplin.settings.setValue('llmSelect', llmSelect);
+
+    try {
         const llmSettingValues = await joplin.settings.values([
-        'llmModel','llmServerUrl','llmKey', 'llmExtra', 'llmMcp',
-        'llmModel2','llmServerUrl2','llmKey2','llmExtra2','llmMcp2',
-        'llmModel3','llmServerUrl3','llmKey3','llmExtra3','llmMcp3',]);
-        //
-        // 基础参数
-        //
-        let apiModel = '', apiUrl = '', apiKey = '', extraConfig:any;
-        if(int_target_llm==2){
-            apiModel = String(llmSettingValues['llmModel2']).trim();
-            apiUrl = String(llmSettingValues['llmServerUrl2']) + '/chat/completions';
-            apiKey = String(llmSettingValues['llmKey2']).trim();
-        }
-        else if(int_target_llm==3){
-            apiModel = String(llmSettingValues['llmModel3']).trim();
-            apiUrl = String(llmSettingValues['llmServerUrl3']) + '/chat/completions';
-            apiKey = String(llmSettingValues['llmKey3']).trim();
-        }
-        else{
-            apiModel = String(llmSettingValues['llmModel']).trim();
-            apiUrl = String(llmSettingValues['llmServerUrl']) + '/chat/completions';
-            apiKey = String(llmSettingValues['llmKey']).trim();
-        }
+            'llmModel','llmServerUrl','llmKey', 'llmKeyBak','llmExtra', 'llmMcp',
+            'llmModel2','llmServerUrl2','llmKey2','llmKeyBak2','llmExtra2','llmMcp2',
+            'llmModel3','llmServerUrl3','llmKey3','llmKeyBak3','llmExtra3','llmMcp3'
+        ]);
+
+        // 使用内部备份函数
+        return await _backup_apikey_internal(llmSelect, llmSettingValues);
+    }
+    finally {
+        // 恢复原始的llmSelect值
+        await joplin.settings.setValue('llmSelect', currentSelect);
+    }
+}
+
+export async function check_llm_status(){
+    let test_result = 'OK';
+    //
+    try {
+        // 使用统一的参数读取函数
+        const dict_llm = await get_llm_options();
+
+        // 提取各个参数
+        const apiModel = dict_llm['model'];
+        const apiUrl = dict_llm['url'];
+        const apiKey = dict_llm['key'];
+        const int_target_llm = dict_llm['llmSelect'];
+
         // 如果关键参数缺失，直接报错，不需要走后面的流程
         if (apiModel.trim() === ''){
             test_result = 'Model Name is Empty?';
-        } 
+        }
         else if(apiUrl.trim() === ''){
             test_result = 'Model URL is Empty?';
         }
@@ -1208,27 +1327,36 @@ export async function changeLLM(llm_no=0) {
             } catch {
                 test_result = 'Connection_Error';
             }
-        };
+        }
+
         if (test_result == 'OK'){
             await joplin.commands.execute('editor.execCommand', {
                 name: 'cm-tempFloatingObject',
-                args: [{ text: `LLM ${int_target_llm} Status: OK`, 
+                args: [{ text: `LLM ${int_target_llm} Status: OK (Model = ${apiModel}) `,
                     floatId: String(2500+(Date.now()%500)), ms: 2000, bgColor: COLOR_FLOAT.FINISH }]
             });
         }
         else {
             await joplin.commands.execute('editor.execCommand', {
                 name: 'cm-tempFloatingObject',
-                args: [{ text: `LLM ${int_target_llm} Error: ${test_result}`, 
+                args: [{ text: `LLM ${int_target_llm} Error: ${test_result} (Model = ${apiModel}) `,
                     floatId: String(2500+(Date.now()%500)), ms: 3500, bgColor: COLOR_FLOAT.WARNING }]
             });
         }
     }
+    catch (err) {
+        console.error('Error in check_llm_status:', err);
+        await joplin.commands.execute('editor.execCommand', {
+            name: 'cm-tempFloatingObject',
+            args: [{ text: `LLM Status Check Error: ${err}`,
+                floatId: String(2500+(Date.now()%500)), ms: 3500, bgColor: COLOR_FLOAT.WARNING }]
+        });
+    }
 }
 
-async function testListModels(baseURL, apiKey) {
+async function testListModels(baseURL:string, apiKey:string) {
     try {
-        let fixedURL= baseURL.replace("/v1/chat/completions", '/v1/models')
+        let fixedURL= baseURL.replace("/chat/completions", '/models')
         const response = await fetch(`${fixedURL}`, {
             headers: { 'Authorization': `Bearer ${apiKey}` }
         });

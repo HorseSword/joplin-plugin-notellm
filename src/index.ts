@@ -1,7 +1,7 @@
 import joplin from 'api';
 import {ToolbarButtonLocation, ContentScriptType, MenuItemLocation } from 'api/types';
 import {registerSettings, pluginIconName } from './settings';
-import {llmReplyStream, llmReplyStop, changeLLM} from './my_utils';
+import {llmReplyStream, llmReplyStop, changeLLM, check_llm_status} from './my_utils';
 import {getTxt} from './texts';
 import {mcp_call_tool, mcp_get_tools} from './mcpClient';
 
@@ -342,6 +342,15 @@ joplin.plugins.register({
 			}
 		})
 		
+		await joplin.commands.register({
+			name: 'checkLLMStatus',
+			label: 'NoteLLM: Check LLM Status',
+			iconName: 'far fa-comment-dots',
+			execute: async () => {
+				return await check_llm_status();
+			}
+		})
+
 		// 
 		//
 		// 添加一个菜单项到顶部“工具”菜单中
@@ -391,6 +400,11 @@ joplin.plugins.register({
 		// 	'askLLMChat', 
 		//     ToolbarButtonLocation.NoteToolbar
 		// );
+		await joplin.views.toolbarButtons.create(
+		    'checkLLMStatus', 
+			'checkLLMStatus', 
+		    ToolbarButtonLocation.NoteToolbar
+		);
 		//
 		// 添加按钮到笔记编辑区的工具栏
         // await joplin.views.toolbarButtons.create(
