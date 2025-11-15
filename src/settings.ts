@@ -387,19 +387,30 @@ export async function registerSettings(): Promise<void> {
         public: true,
         advanced: false,
       };
+      dict_settings['llmMcpHeaders_'+n_mcp] = {
+        type: SettingItemType.String,
+        value: '',
+        label: 'Custom headers for MCP ' + n_mcp,
+        section: 'notellm.mcp',
+        public: true,
+        advanced: false,
+      };
       if(n<=1){
         // dict_settings['llmMcpEnabled_'+n_mcp]['description'] = '';
         dict_settings['llmMcpReminder_'+n_mcp]['description'] = 'For noting the name of the MCP. Just name it!';
         dict_settings['llmMcpServer_'+n_mcp]['description'] = 'Support streamableHTTP MCP servers. e.g. http://127.0.0.1:17001/mcp, https://api.githubcopilot.com/mcp/, or https://mcp.map.baidu.com/mcp?ak=xxx'
+        dict_settings['llmMcpHeaders_'+n_mcp]['description'] = 'Custom headers in JSON format, e.g. {"Authorization":"Bearer token","User-Agent":"MyApp"}'
       }
       else{
         // dict_settings['llmMcpReminder_'+n_mcp]['description'] = 'Just name it.';
         dict_settings['llmMcpServer_'+n_mcp]['description'] = 'StreamableHTTP MCP servers.'
+        dict_settings['llmMcpHeaders_'+n_mcp]['description'] = 'Custom headers in JSON format.'
       }
       if (n>7){
         dict_settings['llmMcpEnabled_'+n_mcp]['advanced'] = true;
         dict_settings['llmMcpReminder_'+n_mcp]['advanced'] = true;
         dict_settings['llmMcpServer_'+n_mcp]['advanced'] = true;
+        dict_settings['llmMcpHeaders_'+n_mcp]['advanced'] = true;
       }
     }
     //

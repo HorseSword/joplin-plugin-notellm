@@ -1,4 +1,3 @@
-import joplin from '../api';
 
 interface JSONRPCMessage {
   jsonrpc: "2.0";
@@ -22,9 +21,25 @@ class MCPClient {
   private baseUrl: string;
   private sessionId: string | null = null;
   private requestId = 0;
+  private customHeaders: Record<string, string> = {};
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, customHeaders: string = '') {
     this.baseUrl = baseUrl;
+    this.parseCustomHeaders(customHeaders);
+  }
+
+  private parseCustomHeaders(headersJson: string): void {
+    if (!headersJson || headersJson.trim() === '') {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(headersJson);
+      this.customHeaders = parsed;
+    } catch (error) {
+      console.error('Error parsing custom headers JSON:', error);
+      this.customHeaders = {};
+    }
   }
 
   private generateId(): string {
@@ -65,12 +80,13 @@ class MCPClient {
 
   // 发送请求（关键：处理流式响应）
   private async sendRequest(
-    message: JSONRPCMessage, 
+    message: JSONRPCMessage,
     isInit = false
   ): Promise<{ data: any; headers?: Headers }> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream' // 支持流式响应
+      'Accept': 'application/json, text/event-stream', // 支持流式响应
+      ...this.customHeaders // 添加自定义 headers
     };
 
     // 添加会话 ID（除了初始化请求）
@@ -174,7 +190,8 @@ class MCPClient {
   private async sendNotification(message: Omit<JSONRPCMessage, 'id'>): Promise<void> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Accept': 'text/event-stream, application/json'
+      'Accept': 'text/event-stream, application/json',
+      ...this.customHeaders // 添加自定义 headers
     };
 
     if (this.sessionId) {
@@ -262,11 +279,12 @@ class MCPClient {
 // tool_name='get_date_diff'
 /**
  * 输入 mcp 服务器网址，返回可用的工具；
- * @param mcp_url 
- * @returns 
+ * @param mcp_url
+ * @param mcp_headers 自定义 headers 的 JSON 字符串
+ * @returns
  */
-export async function mcp_get_tools(mcp_url:string) {
-  const client = new MCPClient(mcp_url);
+export async function mcp_get_tools(mcp_url:string, mcp_headers:string = '') {
+  const client = new MCPClient(mcp_url, mcp_headers);
   
   try {
     // 初始化连接
@@ -289,21 +307,27 @@ export async function mcp_get_tools(mcp_url:string) {
 
 /**
  * 返回 openai 格式的工具列表。
- * @param MCP_SERVER_URL 
+ * @param MCP_SERVER_URL
+ * @param MCP_SERVER_HEADERS 对应的 headers 字符串，用 | 分隔多个服务器的 headers
  * @returns 字典，包括 tools, tmap.
  */
-export async function mcp_get_tools_openai(MCP_SERVER_URL:string) {
-  // 
+export async function mcp_get_tools_openai(MCP_SERVER_URL:string, MCP_SERVER_HEADERS:string = '') {
+  //
   let lst_tools_openai = [];
   let dict_map = {}
   let n = 0;
-  for (let server_url of MCP_SERVER_URL.split("|")){
+  const server_urls = MCP_SERVER_URL.split("|");
+  const server_headers = MCP_SERVER_HEADERS ? MCP_SERVER_HEADERS.split("|") : [];
+
+  for (let i = 0; i < server_urls.length; i++){
+    let server_url = server_urls[i];
+    let server_header = server_headers[i] || '';
     if(server_url.trim().length)
       try{
           n+=1;
           let prefix = 's'+String(n).padStart(2,"0");
           // console.log('line_479, server_url = ',server_url)
-          let tools_of_mcp = await mcp_get_tools(server_url.trim());
+          let tools_of_mcp = await mcp_get_tools(server_url.trim(), server_header.trim());
           console.log('[INFO_302] tools_of_mcp =',tools_of_mcp)
           let lst_tools = []
           // 如果返回是列表的话，再处理一次
@@ -328,7 +352,8 @@ export async function mcp_get_tools_openai(MCP_SERVER_URL:string) {
               lst_tools_openai.push(tool_openai_one)
               dict_map[prefix + '_' + tool_mcp_one.name] = {
                 "function_name": tool_mcp_one.name,
-                "server_url": server_url.trim()
+                "server_url": server_url.trim(),
+                "headers": server_header.trim()
               }
           } 
       }
@@ -343,8 +368,8 @@ export async function mcp_get_tools_openai(MCP_SERVER_URL:string) {
   };
 }
 
-export async function mcp_call_tool(mcp_url:string, tool_name:string, args:any={}) {
-  const client = new MCPClient(mcp_url);
+export async function mcp_call_tool(mcp_url:string, tool_name:string, args:any={}, mcp_headers:string = '') {
+  const client = new MCPClient(mcp_url, mcp_headers);
   
   try {
     // 初始化连接

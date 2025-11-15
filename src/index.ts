@@ -328,8 +328,8 @@ joplin.plugins.register({
 			name: 'mcp_call_tool',
 			label: 'mcp_call_tool',
 			iconName: 'fas fa-comment-slash',
-			execute: async (mcp_url, tool_name, args={}) => {
-				return await mcp_call_tool(mcp_url, tool_name, args);
+			execute: async (mcp_url, tool_name, args={}, headers='') => {
+				return await mcp_call_tool(mcp_url, tool_name, args, headers);
 			}
 		})
 
@@ -337,8 +337,8 @@ joplin.plugins.register({
 			name: 'mcp_get_tools',
 			label: 'mcp_get_tools',
 			iconName: 'fas fa-comment-slash',
-			execute: async (mcp_url) => {
-				return await mcp_get_tools(mcp_url);
+			execute: async (mcp_url, headers='') => {
+				return await mcp_get_tools(mcp_url, headers);
 			}
 		})
 		

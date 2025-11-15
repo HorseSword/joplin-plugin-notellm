@@ -333,28 +333,34 @@ export async function llmReplyStream({
         let n_mcp = String(n).padStart(2,"0");
         lst_mcp_setting_keys.push('llmMcpEnabled_'+n_mcp)
         lst_mcp_setting_keys.push('llmMcpServer_'+n_mcp)
+        lst_mcp_setting_keys.push('llmMcpHeaders_'+n_mcp)
     }
     const dict_mcp_settings = await joplin.settings.values(lst_mcp_setting_keys);  // 读取设置项
     //
     let mcp_servers_str = ''; // MCP服务器网址拼接的字符串
+    let mcp_headers_str = ''; // MCP服务器headers拼接的字符串
     if(Number(dict_mcp_settings['llmMcpEnabled'])>0) { // MCP总开关
         for (let n = 1; n <= N_MAP_MAX; n++){
             let n_mcp = String(n).padStart(2,"0");
             if(dict_mcp_settings['llmMcpEnabled_'+n_mcp]){ // 如果启用
                 let mcp_server_one = String(dict_mcp_settings['llmMcpServer_'+n_mcp]);
+                let mcp_headers_one = String(dict_mcp_settings['llmMcpHeaders_'+n_mcp] || '');
                 if(mcp_server_one.trim().length>0){
                     if(mcp_servers_str.length<=0){
                         mcp_servers_str = mcp_server_one.trim();
+                        mcp_headers_str = mcp_headers_one.trim();
                     }
                     else{
                         mcp_servers_str = mcp_servers_str + '|' + mcp_server_one.trim();
-                    } 
-                } 
+                        mcp_headers_str = mcp_headers_str + '|' + mcp_headers_one.trim();
+                    }
+                }
             }
         }
     }
     // const MCP_SERVER = String(llmSettingValues['llmMcpServer']); // 读取设置
     const MCP_SERVER = mcp_servers_str;
+    const MCP_HEADERS = mcp_headers_str;
     const MAX_TOOL_CALL_ROUND = 3; // 不允许 MCP 的循环调用次数过多
     //
     let IS_MCP_ENABLED = (mcp_number > 0 && MCP_SERVER.trim().length > 0);
@@ -634,7 +640,7 @@ export async function llmReplyStream({
             requestBody['temperature'] = 0;
         }
         else {  // 获取可用工具的列表
-            openai_tools = await mcp_get_tools_openai(MCP_SERVER);
+            openai_tools = await mcp_get_tools_openai(MCP_SERVER, MCP_HEADERS);
             openai_map = openai_tools['tmap'];
             //
             if (openai_tools['tools'].length > 0) {  // 还需要更多的格式验证
@@ -1066,8 +1072,9 @@ export async function llmReplyStream({
                         let tool_call_args = JSON.parse(tool_call_args_json)
                         let tool_real_name = openai_map[tool_call_name]['function_name']
                         let tool_real_server_url = openai_map[tool_call_name]['server_url']
+                        let tool_headers = openai_map[tool_call_name]['headers'] || ''
                         //
-                        console.log(`tool_real_server_url = ${tool_real_server_url}, tool_call_name = ${tool_call_name}, tool_real_name = ${tool_real_name}`) 
+                        console.log(`tool_real_server_url = ${tool_real_server_url}, tool_call_name = ${tool_call_name}, tool_real_name = ${tool_real_name}`)
                         console.log('tool_call_args = ', tool_call_args)
                         console.log('len = ', Object.keys(tool_call_args).length)
                         let result_one:any;
@@ -1075,13 +1082,16 @@ export async function llmReplyStream({
                             result_one = await mcp_call_tool(
                                 tool_real_server_url,
                                 tool_real_name, //'get_date_diff',
-                                tool_call_args //{date_from:'2025-01-01',date_to:'2025-01-10'}
+                                tool_call_args, //{date_from:'2025-01-01',date_to:'2025-01-10'}
+                                tool_headers
                             )
                         }
                         else{
                             result_one = await mcp_call_tool(
                                 tool_real_server_url,
                                 tool_real_name, //'get_date_diff',
+                                {},
+                                tool_headers
                             )
                         }
                         console.log('[Line 934] result_one = ',result_one)  // TODO 还需要处理错误情况
