@@ -1,19 +1,14 @@
 // import { getCurves } from 'crypto';  // I think, this is useless. Why here?
 import joplin from '../api';
-import {getTxt} from './texts';
+import { getTxt } from './texts';
+import { get_llm_options } from './llmConf';
 import { 
     FLOATING_HTML_BASIC, FLOATING_HTML_THINKING, FLOATING_HTML_WAITING, 
-    COLOR_FLOAT, makeJumpingHtml, FloatProgressAnimator
+    COLOR_FLOAT, makeJumpingHtml, FloatProgressAnimator, 
+    temp_floating_object, short_folating
  } from './pluginFloatingObject';
-import {mcp_call_tool, mcp_get_tools, mcp_get_tools_openai, get_mcp_prompt} from './mcpClient';
+import { mcp_call_tool, mcp_get_tools, mcp_get_tools_openai, get_mcp_prompt } from './mcpClient';
 
-/**
- * 对话的消息体类
- */
-interface OneMessage {
-    role: string;
-    content: string;
-  }
 // 
 /**
  * 滚动条移动到光标位置
@@ -48,6 +43,26 @@ function formatDateTime(date) {
 function formatNow() {
     const now = new Date();
     return formatDateTime(now);
+}
+/**
+ * 计算字符串 A 的尾部与字符串 B 的头部的重叠长度
+ * @param strA 
+ * @param strB 
+ * @returns 重叠长度 int
+ */ 
+function getOverlapLength(strA: string, strB: string): number {
+  // 1. 最大可能的重叠长度受限于两个字符串中较短的那个
+  const maxOverlap = Math.min(strA.length, strB.length);
+  // 2. 从最大长度开始递减，寻找 A 的后缀与 B 的前缀是否相等
+  for (let n = maxOverlap; n > 0; n--) {
+    const suffixA = strA.slice(-n); // A 的最后 n 个字符
+    const prefixB = strB.slice(0, n); // B 的前 n 个字符
+    if (suffixA === prefixB) {
+      return n; // 找到最大匹配，立即返回
+    }
+  }
+  // 3. 没有任何后缀与前缀匹配
+  return 0;
 }
 //
 /**
@@ -109,139 +124,112 @@ async function checkServerStatus(url:string,
         };
     }
 }
+
 /**
+ * 创建一个延迟函数，让出控制权
  * 
+ * 参数是延迟的毫秒数
  */
-// 创建一个延迟函数，让出控制权
 function sleep_ms(ms:number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
+
 //
 /**
- * API key backup 的内部实现，避免循环依赖
- * @param llmSelect
- * @param llmSettingValues
+ * 获取光标的位置
+ * @returns 
  */
-async function _backup_apikey_internal(llmSelect:number, llmSettingValues:any) {
-    let sKey = '', sKeyBak = '';
-
-    if (llmSelect==2){
-        sKey = 'llmKey2'; sKeyBak = 'llmKeyBak2';
-    }
-    else if (llmSelect==3){
-        sKey = 'llmKey3'; sKeyBak = 'llmKeyBak3';
-    }
-    else {
-        sKey = 'llmKey'; sKeyBak = 'llmKeyBak';
-    }
-
-    let apiKey = String(llmSettingValues[sKey]).trim();
-
-    // key may disappear after updating, so backup it.
-    if(apiKey.length<=0){
-        // read backup
-        let apiKeyBak = String(llmSettingValues[sKeyBak]).trim();
-        if(apiKeyBak.length>0){
-            apiKey = apiKeyBak;
-            await joplin.settings.setValue(sKey, apiKey);  
-        }
-    }
-    else{ // if apiKey.length > 0
-        // write backup
-        await joplin.settings.setValue(sKeyBak, apiKey);  
-    }
-    return apiKey;
+async function get_cursor_pos() {
+    let tmp_cur = await joplin.commands.execute('editor.execCommand', {
+        name: 'cm-getCursorPos' 
+    });
+    return tmp_cur;
 }
+
 
 /**
- * 用于读取大语言模型的设置参数，并以字典的形式返回。
- * 通过这种方式，解耦模型参数读取与模型调用过程。
- *
- * @returns
+ * For chat only. 
+ * Split long text to dialog list, including role and content.
  */
-async function get_llm_options() {
-    // 读取设置的参数
-    const llmSettingValues = await joplin.settings.values([
-        'llmModel','llmServerUrl','llmKey', 'llmKeyBak','llmExtra', 'llmMcp',
-        'llmModel2','llmServerUrl2','llmKey2','llmKeyBak2','llmExtra2','llmMcp2',
-        'llmModel3','llmServerUrl3','llmKey3','llmKeyBak3','llmExtra3','llmMcp3',
-        'llmSelect',
-        'llmTemperature', 'llmMaxTokens', 'llmScrollType',
-        'llmChatType', 'llmChatSkipThink', 'llmChatPrompt',
-        // 'llmMcpServer'
-    ]);
-    let dict_llm = {}
-    // 基础参数
-    let llmSelect = parseInt(String(llmSettingValues['llmSelect']));  // 模型入口序号
-    let sModel = '', sUrl = '', sKey = '', sKeyBak = '', sExtra = '', sMcp = '';
-    //
-    if (llmSelect==2){
-        sModel = 'llmModel2'; sUrl = 'llmServerUrl2'; sKey = 'llmKey2';
-        sKeyBak = 'llmKeyBak2'; sExtra = 'llmExtra2'; sMcp = 'llmMcp2';
+export function splitTextToMessages(raw:string, remove_think:boolean=true) {
+
+    const lines = raw.split(/\r?\n/);
+    // let remove_think = true;
+    let result = [];
+    let buffer = [];
+    let currentRole = "user";
+    let inResponse = false;
+    let responder = null;
+
+    // 辅助函数：将 buffer 合并入 result
+    function flushBuffer(role:string) {
+      if (buffer.length === 0) return;
+      const content = buffer.join('\n');
+      // 合并到 result，如果上一个的 role 相同
+      if (result.length > 0 && result[result.length - 1].role === role) {
+        result[result.length - 1].content += '\n' + content;
+      } else {
+        result.push({ role, content });
+      }
+      buffer = [];
     }
-    else if (llmSelect==3){
-        sModel = 'llmModel3'; sUrl = 'llmServerUrl3'; sKey = 'llmKey3';
-        sKeyBak = 'llmKeyBak3'; sExtra = 'llmExtra3'; sMcp = 'llmMcp3';
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // 检查开始标记
+      const startMatch = line.match(/^\*\*Response from (.+):\*\*$/);
+      if (startMatch) {
+        // 先flush之前的内容
+        flushBuffer(currentRole);
+
+        // 启动新的包裹
+        inResponse = true;
+        responder = startMatch[1].trim();
+        // currentRole = responder;
+        currentRole = "assistant";
+        continue;
+      }
+
+      // 检查结束标记
+      if (line.trim() === '\*\*End of response\*\*') {
+        flushBuffer(currentRole);
+        inResponse = false;
+        responder = null;
+        currentRole = "user";
+        continue;
+      }
+
+      // 处理内容
+      buffer.push(line);
     }
-    else {
-        sModel = 'llmModel'; sUrl = 'llmServerUrl'; sKey = 'llmKey';
-        sKeyBak = 'llmKeyBak'; sExtra = 'llmExtra'; sMcp = 'llmMcp';
+
+    // 处理最后残留
+    flushBuffer(currentRole);
+
+    // 去除纯空内容
+    // const cleanResult = result.filter(item => item.content.trim() !== '');
+
+    // 移除 <think> </think> 部分 
+    // TODO 正文如果出现 <think> </think>，可能会存在 bug，不过严格来说并不影响显示，所以先观察试试
+    if(remove_think && result.length > 0){
+        for (let i = 0; i < result.length; i++) {
+            if (result[i].role === "assistant"){
+                let content = result[i].content;
+                // let content_without_think = content.trim().replace(/^<think>[\s\S]*?<\/think>/, '').trimStart();  // 只处理第一个
+                let content_without_think = content.trim().replace(/<think>[\s\S]*?<\/think>/g, '').trimStart();  // g 代表全替换
+                result[i].content = content_without_think;
+            } 
+            else{
+                result[i].content = result[i].content.trim();
+            }
+        }
     }
     //
-    dict_llm['llmSelect'] = llmSelect;
-    dict_llm['model'] = String(llmSettingValues[sModel]).trim();
-    // url and fixed urls
-    let input_url = String(llmSettingValues[sUrl])
-    if (input_url.endsWith('/chat/completions')){
-        dict_llm['url'] = input_url;
-    }
-    else if (input_url.endsWith('/')){
-        dict_llm['url'] = input_url + 'chat/completions';
-    }
-    else {
-        dict_llm['url'] = input_url + '/chat/completions';
-    }
-    //
-    dict_llm['extra_config'] = String(llmSettingValues[sExtra]);
-    dict_llm['mcp_number'] = Number(llmSettingValues[sMcp]);
-    //
-    // 添加滚动类型相关参数
-    dict_llm['scrollType'] = parseInt(String(llmSettingValues['llmScrollType']));
-    let scroll_method = 'desktop';
-    if (dict_llm['scrollType']==1) {
-        scroll_method = 'desktop'
-    }
-    else if (dict_llm['scrollType']==2) {
-        scroll_method = 'mobile'
-    }
-    else {
-        scroll_method = 'none'
-    }
-    dict_llm['scroll_method'] = scroll_method;
-    //
-    // 添加聊天相关参数
-    dict_llm['chatType'] = parseInt(String(llmSettingValues['llmChatType']));
-    dict_llm['chatSkipThink'] = Number(llmSettingValues['llmChatSkipThink']);
-    dict_llm['chatPrompt'] = String(llmSettingValues['llmChatPrompt']);
-    //
-    // 添加温度和最大token参数
-    dict_llm['temperature'] = parseFloat(String(llmSettingValues['llmTemperature']));
-    dict_llm['maxTokens'] = parseInt(String(llmSettingValues['llmMaxTokens'])) ;
-    //
-    // 添加原始设置值，用于其他函数
-    dict_llm['sModel'] = sModel;
-    dict_llm['sUrl'] = sUrl;
-    dict_llm['sKey'] = sKey;
-    dict_llm['sKeyBak'] = sKeyBak;
-    dict_llm['sExtra'] = sExtra;
-    dict_llm['sMcp'] = sMcp;
-    dict_llm['allSettingValues'] = llmSettingValues;
-    //
-    // key may disappear after updating, so backup it.
-    dict_llm['key'] = await _backup_apikey_internal(llmSelect, llmSettingValues);
-    //
-    return dict_llm
+    return result;
 }
+
+
 /**
  * 流式回复的可调用函数
  * 
@@ -393,17 +381,6 @@ export async function llmReplyStream({
     let result_whole = '' // 存储本次回复生成的完整文档。但好像并没有用到？
     let cursor_pos:any;  // 光标位置
     //
-    /**
-     * 获取光标的位置
-     * @returns 
-     */
-    async function get_cursor_pos() {
-        let tmp_cur = await joplin.commands.execute('editor.execCommand', {
-            name: 'cm-getCursorPos' 
-        });
-        return tmp_cur;
-    }
-    //
     // head and tail
     const HEAD_TAIL_N_CNT = 2
     const CHAT_HEAD = `Response from ${apiModel}:`;  // 不需要加粗
@@ -447,7 +424,7 @@ export async function llmReplyStream({
             let last_pos = cursor_pos.startLine.from + cursor_pos.startPosition.column;
             await joplin.commands.execute('editor.execCommand', {
                 name: 'cm-moveCursorPosition',
-                args: [last_pos]
+                args: [last_pos, false]
             });
         }
         catch(e){
@@ -496,6 +473,7 @@ export async function llmReplyStream({
     }
     // 
     // ===============================================================
+    //
     // 构造对话列表
     let prompt_messages = [];
     // 如果有传入的，直接使用
@@ -503,7 +481,7 @@ export async function llmReplyStream({
         prompt_messages = lst_msg;
     }
     else{
-        // 补充当前的时间
+        // 自动补充当前的时间
         const ADD_CURRENT_TIME = true;
         if (ADD_CURRENT_TIME){
             prompt_messages.push({ role: 'system', content: `<current_time> ${formatNow()} </current_time>`});
@@ -796,7 +774,7 @@ export async function llmReplyStream({
             if (typeof chunk === "string"){  // 块作为整体，因为一次可能收到多行，每行都是 data: 开头，或者纯空行
                 //
                 // 只要有反馈了，就可以停止waiting提示
-                await on_wait_end();
+                // await on_wait_end();
                 //
                 for (const data_line of chunk.split('\n')) { // 逐行拆解。
                     // 理论上讲，这里拆解并不会将 json 中间断开，因为换行符都被转义了
@@ -841,7 +819,8 @@ export async function llmReplyStream({
                                 // cursor_pos = await get_cursor_pos();
                             }
                         }
-                        console.info('reply_type = ', reply_type);
+                        console.info('[875] new_delta = ', new_delta)
+                        console.info('[876] reply_type = ', reply_type);
                         //
                         //if (reply_type == 'tool_calls') {  // 如果是工具调用
                             //
@@ -965,15 +944,21 @@ export async function llmReplyStream({
                 }
                 //
                 // 显示完成提示
-                await joplin.commands.execute('editor.execCommand', {
-                    name: 'cm-tempFloatingObject',
-                    args: [{ 
-                        text: `Finished.`, 
-                        floatId: String(2500+(Date.now()%500)), 
-                        ms: 2000, 
-                        bgColor: COLOR_FLOAT.FINISH
-                    }]
-                });
+                // await joplin.commands.execute('editor.execCommand', {
+                //     name: 'cm-tempFloatingObject',
+                //     args: [{ 
+                //         text: `Finished.`, 
+                //         floatId: String(2500+(Date.now()%500)), 
+                //         ms: 2000, 
+                //         bgColor: COLOR_FLOAT.FINISH
+                //     }]
+                // });
+                await short_folating(
+                    `Finished.`, 
+                    String(2500+(Date.now()%500)), 
+                    2000, 
+                    COLOR_FLOAT.FINISH
+                );
             }
             catch(err){
                 console.error('ERR501_in_utils.ts: ', err);
@@ -993,7 +978,7 @@ export async function llmReplyStream({
                 if (!lst_tool_call_quests[index]) {
                     lst_tool_call_quests[index] = { id: "", type: "function", function: { name: "", arguments: "" } };
                 }
-                
+
                 // 拼接 ID
                 if (toolCallDelta.id) {
                     lst_tool_call_quests[index].id += toolCallDelta.id;
@@ -1212,19 +1197,31 @@ export async function llmReplyStop() {
     if (is_running == 1){ // 正在运行，强行停止
         await joplin.settings.setValue('llmFlagLlmRunning', 0);
         // alert('Force stopped!')
-        await joplin.commands.execute('editor.execCommand', {
-            name: 'cm-tempFloatingObject',
-            args: [{ text: `NoteLLM force stoped!`, 
-                floatId: 'llm_stop_1', ms: 3000, bgColor: COLOR_FLOAT.WARNING }]
-        });
+        // await joplin.commands.execute('editor.execCommand', {
+        //     name: 'cm-tempFloatingObject',
+        //     args: [{ text: `NoteLLM force stoped!`, 
+        //         floatId: 'llm_stop_1', ms: 3000, bgColor: COLOR_FLOAT.WARNING }]
+        // });
+        await short_folating(
+            `NoteLLM force stoped!`, 
+            'llm_stop_1', 
+            3000, 
+            COLOR_FLOAT.WARNING
+        );
         return;
     }
     else { // 并没有运行
-        await joplin.commands.execute('editor.execCommand', {
-            name: 'cm-tempFloatingObject',
-            args: [{ text: `NoteLLM stoped.`, 
-                floatId: 'llm_stop_0', ms: 3000, bgColor: COLOR_FLOAT.FINISH }]
-        });
+        // await joplin.commands.execute('editor.execCommand', {
+        //     name: 'cm-tempFloatingObject',
+        //     args: [{ text: `NoteLLM stoped.`, 
+        //         floatId: 'llm_stop_0', ms: 3000, bgColor: COLOR_FLOAT.FINISH }]
+        // });
+        await short_folating(
+            `NoteLLM stoped.`, 
+            'llm_stop_0', 
+            3000, 
+            COLOR_FLOAT.FINISH
+        );
     }
 }
 
@@ -1259,56 +1256,30 @@ export async function changeLLM(llm_no=0) {
     const dict_llm = await get_llm_options();
     const apiModel = dict_llm['model'];
     //
-    await joplin.commands.execute('editor.execCommand', {
-        name: 'cm-tempFloatingObject',
-        args: [{ text: `LLM ${int_target_llm} selected! Model = (${apiModel}) `, 
-            floatId: String(2500+(Date.now()%500)), ms: 2000, bgColor: COLOR_FLOAT.SETTING }]
-    });
+    await short_folating(
+        `LLM ${int_target_llm} (${apiModel}) selected!`,
+        String(2500+(Date.now()%500)),
+        3000,
+        COLOR_FLOAT.SETTING
+    );
     //
     // test llm connection
     let TEST_LLM_CONNECTION = true;
     if (TEST_LLM_CONNECTION) {
-        await check_llm_status();
+        await check_llm_status(false);
     }
 }
 
-/**
- * API key may disappear after updating, so backup it.
- * @param llmSelect
- */
-async function backup_apikey(llmSelect:number) {
-    // 读取设置以获取llmSelect当前值
-    const currentSettings = await joplin.settings.values(['llmSelect']);
-    const currentSelect = parseInt(String(currentSettings['llmSelect']));
-
-    // 临时设置llmSelect为指定值以获取正确的配置
-    await joplin.settings.setValue('llmSelect', llmSelect);
-
-    try {
-        const llmSettingValues = await joplin.settings.values([
-            'llmModel','llmServerUrl','llmKey', 'llmKeyBak','llmExtra', 'llmMcp',
-            'llmModel2','llmServerUrl2','llmKey2','llmKeyBak2','llmExtra2','llmMcp2',
-            'llmModel3','llmServerUrl3','llmKey3','llmKeyBak3','llmExtra3','llmMcp3'
-        ]);
-
-        // 使用内部备份函数
-        return await _backup_apikey_internal(llmSelect, llmSettingValues);
-    }
-    finally {
-        // 恢复原始的llmSelect值
-        await joplin.settings.setValue('llmSelect', currentSelect);
-    }
-}
-
-export async function check_llm_status(){
+export async function check_llm_status(show_ok=true){
     let test_result = 'OK';
+    let apiModel = '';
     //
     try {
         // 使用统一的参数读取函数
         const dict_llm = await get_llm_options();
 
         // 提取各个参数
-        const apiModel = dict_llm['model'];
+        apiModel = dict_llm['model'];
         const apiUrl = dict_llm['url'];
         const apiKey = dict_llm['key'];
         const int_target_llm = dict_llm['llmSelect'];
@@ -1340,27 +1311,32 @@ export async function check_llm_status(){
         }
 
         if (test_result == 'OK'){
-            await joplin.commands.execute('editor.execCommand', {
-                name: 'cm-tempFloatingObject',
-                args: [{ text: `LLM ${int_target_llm} Status: OK (Model = ${apiModel}) `,
-                    floatId: String(2500+(Date.now()%500)), ms: 2000, bgColor: COLOR_FLOAT.FINISH }]
-            });
+            if (show_ok){
+                await short_folating(
+                    `LLM ${int_target_llm} Status: OK (Model = ${apiModel}) `, 
+                    String(2500+(Date.now()%500)), 
+                    3000, 
+                    COLOR_FLOAT.FINISH
+                );
+            }
         }
         else {
-            await joplin.commands.execute('editor.execCommand', {
-                name: 'cm-tempFloatingObject',
-                args: [{ text: `LLM ${int_target_llm} Error: ${test_result} (Model = ${apiModel}) `,
-                    floatId: String(2500+(Date.now()%500)), ms: 3500, bgColor: COLOR_FLOAT.WARNING }]
-            });
+            await short_folating(
+                `LLM ${int_target_llm} Error: ${test_result} (Model = ${apiModel}) `, 
+                String(2500+(Date.now()%500)), 
+                4000, 
+                COLOR_FLOAT.WARNING
+            );
         }
     }
     catch (err) {
         console.error('Error in check_llm_status:', err);
-        await joplin.commands.execute('editor.execCommand', {
-            name: 'cm-tempFloatingObject',
-            args: [{ text: `LLM Status Check Error: ${err}`,
-                floatId: String(2500+(Date.now()%500)), ms: 3500, bgColor: COLOR_FLOAT.WARNING }]
-        });
+        await short_folating(
+            `LLM (Model = ${apiModel}) Server Connection Error: ${err}`, 
+            String(2500+(Date.now()%500)), 
+            4000, 
+            COLOR_FLOAT.WARNING
+        );
     }
 }
 
@@ -1432,86 +1408,4 @@ async function testChatCompletion(baseURL:string, apiKey:string, model:string) {
             error: error.message
         };
     }
-}
-
-/**
- * For chat only. 
- * Split long text to dialog list, including role and content.
- */
-export function splitTextToMessages(raw:string, remove_think:boolean=true) {
-
-    const lines = raw.split(/\r?\n/);
-    // let remove_think = true;
-    let result = [];
-    let buffer = [];
-    let currentRole = "user";
-    let inResponse = false;
-    let responder = null;
-
-    // 辅助函数：将 buffer 合并入 result
-    function flushBuffer(role:string) {
-      if (buffer.length === 0) return;
-      const content = buffer.join('\n');
-      // 合并到 result，如果上一个的 role 相同
-      if (result.length > 0 && result[result.length - 1].role === role) {
-        result[result.length - 1].content += '\n' + content;
-      } else {
-        result.push({ role, content });
-      }
-      buffer = [];
-    }
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
-      // 检查开始标记
-      const startMatch = line.match(/^\*\*Response from (.+):\*\*$/);
-      if (startMatch) {
-        // 先flush之前的内容
-        flushBuffer(currentRole);
-
-        // 启动新的包裹
-        inResponse = true;
-        responder = startMatch[1].trim();
-        // currentRole = responder;
-        currentRole = "assistant";
-        continue;
-      }
-
-      // 检查结束标记
-      if (line.trim() === '\*\*End of response\*\*') {
-        flushBuffer(currentRole);
-        inResponse = false;
-        responder = null;
-        currentRole = "user";
-        continue;
-      }
-
-      // 处理内容
-      buffer.push(line);
-    }
-
-    // 处理最后残留
-    flushBuffer(currentRole);
-
-    // 去除纯空内容
-    // const cleanResult = result.filter(item => item.content.trim() !== '');
-
-    // 移除 <think> </think> 部分 
-    // TODO 正文如果出现 <think> </think>，可能会存在 bug，不过严格来说并不影响显示，所以先观察试试
-    if(remove_think && result.length > 0){
-        for (let i = 0; i < result.length; i++) {
-            if (result[i].role === "assistant"){
-                let content = result[i].content;
-                // let content_without_think = content.trim().replace(/^<think>[\s\S]*?<\/think>/, '').trimStart();  // 只处理第一个
-                let content_without_think = content.trim().replace(/<think>[\s\S]*?<\/think>/g, '').trimStart();  // g 代表全替换
-                result[i].content = content_without_think;
-            } 
-            else{
-                result[i].content = result[i].content.trim();
-            }
-        }
-    }
-    //
-    return result;
 }

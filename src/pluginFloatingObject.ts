@@ -1,7 +1,8 @@
 import joplin from '../api';
-
 /**
- * 悬浮窗体相关代码。
+ * 当前文件提供关于悬浮窗体相关代码。
+ * 其中的主要用法是：
+ * 
  */
 
 const FLOATING_OBJECT_ID = 'notellm-floating-object';
@@ -19,8 +20,15 @@ export const COLOR_FLOAT = {
     WARNING: COLOR_FLOAT_WARNING
 }
 
+/**
+ * 
+ * @param text 
+ * @param floatId 
+ * @param bgColor 
+ * @param bottom_px 
+ */
 export function add_floating_object (text: string, floatId:string, 
-    bgColor:string = FLOATING_OBJECT_BG) {
+    bgColor:string = FLOATING_OBJECT_BG, bottom_px = 60) {
     //
     // 1. 检查悬浮对象是否已存在
     let floatingEl = document.getElementById(floatId);
@@ -35,7 +43,7 @@ export function add_floating_object (text: string, floatId:string,
         // floatingEl.style.right = '20%';
         // floatingEl.style.left = '20%';
         floatingEl.style.right = '-100px';
-        floatingEl.style.bottom = '60px';
+        floatingEl.style.bottom = `${bottom_px}px`;
         // floatingEl.style.transform = 'translateX(-50%)';
 
         // 设置一个较高的 z-index 确保它在 Joplin 其他 UI 之上
@@ -83,6 +91,13 @@ export function remove_floating_object (floatId:string) {
     }
 }
 
+/**
+ * 短时间显示的 toast 悬浮窗。
+ * @param text 显示文本
+ * @param floatId 编号
+ * @param bgColor 背景颜色
+ * @param ms 显示毫秒数，默认2000毫秒
+ */
 export function temp_floating_object( text: string, floatId:string, bgColor:string = FLOATING_OBJECT_BG, ms: number = 2000){
     //
     add_floating_object(text, floatId, bgColor);
@@ -318,7 +333,7 @@ export const FLOATING_HTML_BASIC = `
     <div class="ball"></div>
     </div>`
 
-    /**
+/**
  * 用自定义悬浮体实现的进度显示
  */
 export class FloatProgressAnimator {
@@ -395,9 +410,10 @@ export class FloatProgressAnimator {
 
 /**
  * 自定义 Toast 管理器
+ * 
  * 用途：
- * - 生成toast
- * - 关闭toast
+ * - 生成toast，在现有的最上面 toast 之上出现；
+ * - 关闭toast，上方 toast 向下移动；
  */
 export class FloatingToastManager {
     // 1. 在顶部声明所有类属性及其类型
@@ -454,4 +470,23 @@ export class FloatingToastManager {
 
     public async stop_all() {
     }
+}
+/**
+ * short term notification
+ * @param text 
+ * @param floatId 
+ * @param ms 
+ * @param bgColor 
+ */
+export async function short_folating(text:string, floatId='shortTermNotify', ms=2000, bgColor:string = FLOATING_OBJECT_BG) {
+    console.log(`Floating[${floatId}]${text}`)
+    await joplin.commands.execute('editor.execCommand', {
+        name: 'cm-tempFloatingObject',
+        args: [{ 
+            text: text, 
+            floatId: floatId, 
+            ms: ms, 
+            bgColor: bgColor
+        }]
+    });
 }
