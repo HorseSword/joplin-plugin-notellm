@@ -4,7 +4,8 @@ import { EditorView, DecorationSet, Decoration, WidgetType } from "@codemirror/v
 import { StateField, StateEffect  } from "@codemirror/state";
 // import {llmReplyStream} from './my_utils';
 
-
+let toasts = {};
+const BOTTOM_DELTA = 12;
 /*
 用法：
 await joplin.commands.execute('editor.execCommand', {
@@ -449,7 +450,15 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                     // floatingEl.style.right = '20%';
                     // floatingEl.style.left = '20%';
                     floatingEl.style.right = '-100px';
-                    floatingEl.style.bottom = '60px';
+                    //
+                    // 修改：检查 toasts 里面的内容，找到最下面的位置，向上加高度
+                    let v_bottom = 60;
+                    for (const value of Object.values(toasts)){
+                        if (value['enabled']>=0 && value['bottom']>=v_bottom){
+                            v_bottom = value['bottom'] + value['height'] + BOTTOM_DELTA;
+                        }
+                    }
+                    floatingEl.style.bottom = `${v_bottom}px`;
                     // floatingEl.style.transform = 'translateX(-50%)';
 
                     // 设置一个较高的 z-index 确保它在 Joplin 其他 UI 之上
@@ -464,13 +473,14 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                     floatingEl.style.borderRadius = '60px';
                     floatingEl.style.fontFamily = 'sans-serif';
                     floatingEl.style.fontSize = '14px';
-                    floatingEl.style.transition = 'right 200ms ease, bottom 5ms ease, opacity 200ms ease';
+                    floatingEl.style.transition = 'right 200ms ease, bottom 80ms ease, opacity 200ms ease';
                     floatingEl.style.minWidth = '120px';
                     
                     // 只用于显示，不允许任何操作交互，避免干扰
                     floatingEl.style.pointerEvents = 'none';
                     floatingEl.style.userSelect = 'none';
-                    
+                    floatingEl.innerHTML = text;  // 兼容 html 元素
+
                     // 将其添加到主文档的 body 中，而不是编辑器内部
                     document.body.appendChild(floatingEl);
 
@@ -478,14 +488,23 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                         remove_floating_object(floatId)
                     });
 
+                    toasts[floatId] = {
+                        'floatId':floatId,
+                        'height':floatingEl.offsetHeight,
+                        'bottom':v_bottom,
+                        'enabled':1
+                    }
+                    console.log(toasts[floatId]);
                 }
-                
-                // 3. 更新其内容
-                // floatingEl.textContent = text;  // 纯文本
-                floatingEl.innerHTML = text;  // 兼容 html 元素
+                else{
+                    // 3. 更新其内容
+                    // floatingEl.textContent = text;  // 纯文本
+                    floatingEl.innerHTML = text;  // 兼容 html 元素
+                }
                 setTimeout(() => {
                     floatingEl.style.opacity = '1';
                     floatingEl.style.right = '-60px';
+                    toasts[floatId]['height'] = floatingEl.offsetHeight;
                 }, 10);
 
                 return {
@@ -500,6 +519,20 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                     return add_floating_object( text, floatId, bgColor);
             });
             //
+            // 纵向移动
+            function set_floating_bottom (floatId:string, bottom:number){
+                const floatingEl = document.getElementById(floatId);
+                //
+                let tm = 200+20;
+                if (floatingEl) {
+                    setTimeout(() => {
+                        // 调整列表
+                        toasts[floatId]['bottom'] = bottom;
+                        floatingEl.style.bottom = `${bottom}px`
+                    },tm)
+                }
+            }
+            //
             function remove_floating_object (floatId:string) {
                 const floatingEl = document.getElementById(floatId);
                 let tm = 10;
@@ -513,6 +546,34 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                         floatingEl.remove();
                     }, tm + 200);
                     // floatingEl.remove();
+                    //
+                    toasts[floatId] = {
+                        'enabled':0,
+                    }
+                    delete toasts[floatId];
+                    //
+                    // 调整已有 toast 的纵向位置
+                    let v_min = 60;
+                    const sortedArray = Object.entries(toasts)
+                        .map(([id, item]) => ({ id, bottom: item['bottom'], height: item['height'] }))
+                        .sort((a, b) => a.bottom - b.bottom);
+                    // console.log(sortedArray);
+                    for (const { id, bottom, height } of sortedArray) {
+                        if (bottom <= v_min){
+                            const floatingEl = document.getElementById(id);
+                            let el_height = floatingEl.offsetHeight;
+                            v_min = v_min + el_height + BOTTOM_DELTA;
+                        }
+                        else if (bottom > v_min){
+                            //
+                            // 调整控件位置
+                            const floatingEl = document.getElementById(id);
+                            let el_height = floatingEl.offsetHeight;
+                            set_floating_bottom(id,v_min);
+                            //
+                            v_min = v_min + el_height + BOTTOM_DELTA;
+                        }
+                    }
                 }
             }
             codeMirrorWrapper.registerCommand("cm-removeFloatingObject", (floatId:string = FLOATING_OBJECT_ID) => {

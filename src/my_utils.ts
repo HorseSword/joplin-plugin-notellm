@@ -137,7 +137,30 @@ function sleep_ms(ms:number) {
 //
 /**
  * 获取光标的位置
- * @returns 
+ * @returns 类似于这样的字典：{
+    "startPosition": {
+        "line": 1,
+        "column": 0
+    },
+    "startLine": {
+        "from": 0,
+        "to": 50,
+        "number": 1,
+        "text": "行内容"
+    },
+    "startCol": 0,
+    "endPosition": {
+        "line": 1,
+        "column": 0
+    },
+    "endLine": {
+        "from": 0,
+        "to": 50,
+        "number": 1,
+        "text": "行内容"
+    },
+    "endCol": 0
+}
  */
 async function get_cursor_pos() {
     let tmp_cur = await joplin.commands.execute('editor.execCommand', {

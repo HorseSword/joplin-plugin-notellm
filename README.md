@@ -106,6 +106,7 @@ After changing "MCP for LLM (preview)" from "OFF" to "MCP (tool call)" below LLM
 
 # Update Logs
 
+- v0.7.5, 2025-12-03. Significantly optimized animation effects.
 - v0.7.4, 2025-12-02. Fixed a bug in screen-scrolling.
 - v0.7.3, 2025-09-30. Fixed a bug for calling Google Gemini.
 - v0.7.2, 2025-09-27. New feature: Automatically check availability after switching models through the menu.

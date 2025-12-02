@@ -400,11 +400,11 @@ joplin.plugins.register({
 		// 	'askLLMChat', 
 		//     ToolbarButtonLocation.NoteToolbar
 		// );
-		await joplin.views.toolbarButtons.create(
-		    'checkLLMStatus', 
-			'checkLLMStatus', 
-		    ToolbarButtonLocation.NoteToolbar
-		);
+		// await joplin.views.toolbarButtons.create(
+		//     'checkLLMStatus', 
+		// 	'checkLLMStatus', 
+		//     ToolbarButtonLocation.NoteToolbar
+		// );
 		//
 		// 添加按钮到笔记编辑区的工具栏
         // await joplin.views.toolbarButtons.create(
