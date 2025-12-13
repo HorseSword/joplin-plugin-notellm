@@ -3,7 +3,8 @@ import joplin from '../api';
 import {getTxt} from './texts';
 
 export function pluginIconName(): string {
-  return 'fas fa-robot';
+  return 'fas fa-comments';
+  // return 'fas fa-robot';
 }
 
 export async function registerSettings(): Promise<void> {

@@ -5,7 +5,7 @@ import joplin from '../api';
  * 
  */
 
-const FLOATING_OBJECT_ID = 'notellm-floating-object';
+export const FLOATING_OBJECT_ID = 'notellm-floating-object';
 export const FLOATING_OBJECT_BG = '#4d53b3'; // 深蓝  // 'rgba(10, 100, 200, 0.9)';
 export const COLOR_FLOAT_FINISH = '#3bba9c'  // 绿色
 export const COLOR_FLOAT_SETTING = '#535f80'  // 蓝灰提示
@@ -20,16 +20,18 @@ export const COLOR_FLOAT = {
     WARNING: COLOR_FLOAT_WARNING
 }
 
+let toasts = {};
+const BOTTOM_DELTA = 12;
+
 /**
- * 
+ * 添加 Floating object
  * @param text 
  * @param floatId 
  * @param bgColor 
- * @param bottom_px 
+ * @returns 
  */
-export function add_floating_object (text: string, floatId:string, 
-    bgColor:string = FLOATING_OBJECT_BG, bottom_px = 60) {
-    //
+export function add_floating_object (text: string, floatId:string, bgColor:string = FLOATING_OBJECT_BG) {
+
     // 1. 检查悬浮对象是否已存在
     let floatingEl = document.getElementById(floatId);
 
@@ -43,7 +45,15 @@ export function add_floating_object (text: string, floatId:string,
         // floatingEl.style.right = '20%';
         // floatingEl.style.left = '20%';
         floatingEl.style.right = '-100px';
-        floatingEl.style.bottom = `${bottom_px}px`;
+        //
+        // 修改：检查 toasts 里面的内容，找到最下面的位置，向上加高度
+        let v_bottom = 60;
+        for (const value of Object.values(toasts)){
+            if (value['enabled']>=0 && value['bottom']>=v_bottom){
+                v_bottom = value['bottom'] + value['height'] + BOTTOM_DELTA;
+            }
+        }
+        floatingEl.style.bottom = `${v_bottom}px`;
         // floatingEl.style.transform = 'translateX(-50%)';
 
         // 设置一个较高的 z-index 确保它在 Joplin 其他 UI 之上
@@ -58,54 +68,96 @@ export function add_floating_object (text: string, floatId:string,
         floatingEl.style.borderRadius = '60px';
         floatingEl.style.fontFamily = 'sans-serif';
         floatingEl.style.fontSize = '14px';
-        floatingEl.style.transition = 'all 200ms ease';
+        floatingEl.style.transition = 'right 200ms ease, bottom 80ms ease, opacity 200ms ease';
         floatingEl.style.minWidth = '120px';
         
         // 只用于显示，不允许任何操作交互，避免干扰
         floatingEl.style.pointerEvents = 'none';
         floatingEl.style.userSelect = 'none';
-        
+        floatingEl.innerHTML = text;  // 兼容 html 元素
+
         // 将其添加到主文档的 body 中，而不是编辑器内部
         document.body.appendChild(floatingEl);
 
+        floatingEl.addEventListener('click', function(){
+            remove_floating_object(floatId)
+        });
+
+        toasts[floatId] = {
+            'floatId':floatId,
+            'height':floatingEl.offsetHeight,
+            'bottom':v_bottom,
+            'enabled':1
+        }
+        console.log(toasts[floatId]);
     }
-    
-    // 3. 更新其内容
-    // floatingEl.textContent = text;  // 纯文本
-    floatingEl.innerHTML = text;  // 兼容 html 元素
+    else{
+        // 3. 更新其内容
+        // floatingEl.textContent = text;  // 纯文本
+        floatingEl.innerHTML = text;  // 兼容 html 元素
+    }
     setTimeout(() => {
         floatingEl.style.opacity = '1';
         floatingEl.style.right = '-60px';
+        toasts[floatId]['height'] = floatingEl.offsetHeight;
     }, 10);
+
+    return {
+        'id': floatingEl.id,
+        'height': floatingEl.offsetHeight,
+        'bottom': floatingEl.style.bottom
+    };
 }
 
+//
+/**
+ * 移除 Floating toast
+ * @param floatId 
+ */
 export function remove_floating_object (floatId:string) {
     const floatingEl = document.getElementById(floatId);
+    let tm = 10;
     if (floatingEl) {
-        floatingEl.style.opacity = '0';
-        floatingEl.style.right = '-100px';
+        setTimeout(() => {
+            floatingEl.style.opacity = '0';
+            // floatingEl.style.bottom = '120px';  // 向上移动
+            floatingEl.style.right = '-120px';  // 向右收回
+        }, tm);
         setTimeout(() => {
             floatingEl.remove();
-        }, 500);
+        }, tm + 200);
         // floatingEl.remove();
+        //
+        toasts[floatId] = {
+            'enabled':0,
+        }
+        delete toasts[floatId];
+        //
+        // 调整已有 toast 的纵向位置
+        let v_min = 60;
+        const sortedArray = Object.entries(toasts)
+            .map(([id, item]) => ({ id, bottom: item['bottom'], height: item['height'] }))
+            .sort((a, b) => a.bottom - b.bottom);
+        // console.log(sortedArray);
+        for (const { id, bottom, height } of sortedArray) {
+            if (bottom <= v_min){
+                const floatingEl = document.getElementById(id);
+                let el_height = floatingEl.offsetHeight;
+                v_min = v_min + el_height + BOTTOM_DELTA;
+            }
+            else if (bottom > v_min){
+                //
+                // 调整控件位置
+                const floatingEl = document.getElementById(id);
+                let el_height = floatingEl.offsetHeight;
+                set_floating_bottom(id,v_min);
+                //
+                v_min = v_min + el_height + BOTTOM_DELTA;
+            }
+        }
     }
 }
 
-/**
- * 短时间显示的 toast 悬浮窗。
- * @param text 显示文本
- * @param floatId 编号
- * @param bgColor 背景颜色
- * @param ms 显示毫秒数，默认2000毫秒
- */
-export function temp_floating_object( text: string, floatId:string, bgColor:string = FLOATING_OBJECT_BG, ms: number = 2000){
-    //
-    add_floating_object(text, floatId, bgColor);
-    //
-    setTimeout(() =>{
-        remove_floating_object(floatId);
-    }, ms);
-}
 
 function get_html_template (temp_type:string) {
     
@@ -407,7 +459,19 @@ export class FloatProgressAnimator {
         //
     }
 }
-
+// 纵向移动
+function set_floating_bottom (floatId:string, bottom:number){
+    const floatingEl = document.getElementById(floatId);
+    //
+    let tm = 200+20;
+    if (floatingEl) {
+        setTimeout(() => {
+            // 调整列表
+            toasts[floatId]['bottom'] = bottom;
+            floatingEl.style.bottom = `${bottom}px`
+        },tm)
+    }
+}
 /**
  * 自定义 Toast 管理器
  * 
@@ -472,13 +536,13 @@ export class FloatingToastManager {
     }
 }
 /**
- * short term notification
+ * short term notification, auto disappears after given ms (2000 ms by default).
  * @param text 
  * @param floatId 
  * @param ms 
  * @param bgColor 
  */
-export async function short_folating(text:string, floatId='shortTermNotify', ms=2000, bgColor:string = FLOATING_OBJECT_BG) {
+export async function add_short_floating(text:string, floatId='shortTermNotify', ms=2000, bgColor:string = FLOATING_OBJECT_BG) {
     console.log(`Floating[${floatId}]${text}`)
     await joplin.commands.execute('editor.execCommand', {
         name: 'cm-tempFloatingObject',
@@ -489,4 +553,34 @@ export async function short_folating(text:string, floatId='shortTermNotify', ms=
             bgColor: bgColor
         }]
     });
+}
+/**
+ * 短时间显示的 toast 悬浮窗。
+ * @param text 显示文本
+ * @param floatId 编号
+ * @param bgColor 背景颜色
+ * @param ms 显示毫秒数，默认2000毫秒
+ */
+// export function temp_floating_object( text: string, floatId:string, 
+//     bgColor:string = FLOATING_OBJECT_BG, ms: number = 2000){
+//     //
+//     add_floating_object(text, floatId, bgColor);
+//     //
+//     setTimeout(() =>{
+//         remove_floating_object(floatId);
+//     }, ms);
+// }
+
+export function temp_floating_object( text: string, floatId:string, bgColor:string = FLOATING_OBJECT_BG, ms: number = 2000){
+    //
+    let d = add_floating_object(text, floatId, bgColor);
+    //
+    setTimeout(() =>{
+        remove_floating_object(floatId);
+    }, ms);
+    return d;
+}
+
+export function get_random_floatid(){
+    return String(2500+(Date.now()%500));
 }

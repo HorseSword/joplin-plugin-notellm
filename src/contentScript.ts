@@ -3,9 +3,12 @@
 import { EditorView, DecorationSet, Decoration, WidgetType } from "@codemirror/view";
 import { StateField, StateEffect  } from "@codemirror/state";
 // import {llmReplyStream} from './my_utils';
+import {FLOATING_OBJECT_ID, FLOATING_OBJECT_BG,
+    add_floating_object, remove_floating_object, temp_floating_object
 
-let toasts = {};
-const BOTTOM_DELTA = 12;
+} from './pluginFloatingObject';
+
+
 /*
 用法：
 await joplin.commands.execute('editor.execCommand', {
@@ -413,193 +416,51 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
                         view.dispatch({ effects: updateLineWidgetEffect.of({ element, widgetId }) });
                     }
             });
-
             //
             // 注册为扩展
-            codeMirrorWrapper.addExtension(lineWidgetField);
+            // codeMirrorWrapper.addExtension(lineWidgetField);  
+            // // 因为用不到，所以先注释掉，需要时取消注释。
+            //
             // codeMirrorWrapper.addExtension(lineNumbers());
             //
+            /////
             // ======= Floating Object ========== ================ ==================
+            /////
             // 悬浮控件，用于显示提示内容
             /*
             用法：
             await joplin.commands.execute('editor.execCommand', {
-                        name: 'cm-addFloatingObject',
-                        args: [{ text: `Hello world` }]
-                    });
-            await joplin.commands.execute('editor.removeCommand', {
-                        name: 'cm-addFloatingObject',
-                    });
+                name: 'cm-addFloatingObject',
+                args: [{ text: `Hello world` }]
+            });
             */
-            //
-            const FLOATING_OBJECT_ID = 'notellm-floating-object';
-            const FLOATING_OBJECT_BG = '#4d53b3'; // 深蓝  // 'rgba(10, 100, 200, 0.9)';
-            //
-            function add_floating_object (text: string, floatId:string, bgColor:string = FLOATING_OBJECT_BG) {
-
-                // 1. 检查悬浮对象是否已存在
-                let floatingEl = document.getElementById(floatId);
-
-                // 2. 如果不存在，则创建它
-                if (!floatingEl) {
-                    floatingEl = document.createElement('div');
-                    floatingEl.id = floatId;
-                    
-                    // 关键：使用 position: fixed 来实现窗口级悬浮
-                    floatingEl.style.position = 'fixed';//'absolute';
-                    // floatingEl.style.right = '20%';
-                    // floatingEl.style.left = '20%';
-                    floatingEl.style.right = '-100px';
-                    //
-                    // 修改：检查 toasts 里面的内容，找到最下面的位置，向上加高度
-                    let v_bottom = 60;
-                    for (const value of Object.values(toasts)){
-                        if (value['enabled']>=0 && value['bottom']>=v_bottom){
-                            v_bottom = value['bottom'] + value['height'] + BOTTOM_DELTA;
-                        }
-                    }
-                    floatingEl.style.bottom = `${v_bottom}px`;
-                    // floatingEl.style.transform = 'translateX(-50%)';
-
-                    // 设置一个较高的 z-index 确保它在 Joplin 其他 UI 之上
-                    floatingEl.style.zIndex = '2048'; 
-                    
-                    // 添加一些样式让它更显眼
-                    floatingEl.style.padding = '10px 80px 10px 40px';
-                    floatingEl.style.boxShadow = '2px 2px 5px rgba(0, 0, 0, 0.2)';
-                    floatingEl.style.opacity = '0.0';
-                    floatingEl.style.backgroundColor = bgColor;
-                    floatingEl.style.color = 'white';
-                    floatingEl.style.borderRadius = '60px';
-                    floatingEl.style.fontFamily = 'sans-serif';
-                    floatingEl.style.fontSize = '14px';
-                    floatingEl.style.transition = 'right 200ms ease, bottom 80ms ease, opacity 200ms ease';
-                    floatingEl.style.minWidth = '120px';
-                    
-                    // 只用于显示，不允许任何操作交互，避免干扰
-                    floatingEl.style.pointerEvents = 'none';
-                    floatingEl.style.userSelect = 'none';
-                    floatingEl.innerHTML = text;  // 兼容 html 元素
-
-                    // 将其添加到主文档的 body 中，而不是编辑器内部
-                    document.body.appendChild(floatingEl);
-
-                    floatingEl.addEventListener('click', function(){
-                        remove_floating_object(floatId)
-                    });
-
-                    toasts[floatId] = {
-                        'floatId':floatId,
-                        'height':floatingEl.offsetHeight,
-                        'bottom':v_bottom,
-                        'enabled':1
-                    }
-                    console.log(toasts[floatId]);
-                }
-                else{
-                    // 3. 更新其内容
-                    // floatingEl.textContent = text;  // 纯文本
-                    floatingEl.innerHTML = text;  // 兼容 html 元素
-                }
-                setTimeout(() => {
-                    floatingEl.style.opacity = '1';
-                    floatingEl.style.right = '-60px';
-                    toasts[floatId]['height'] = floatingEl.offsetHeight;
-                }, 10);
-
-                return {
-                    'id': floatingEl.id,
-                    'height': floatingEl.offsetHeight,
-                    'bottom': floatingEl.style.bottom
-                };
-            }
             codeMirrorWrapper.registerCommand("cm-addFloatingObject", 
                 (payload: { text: string, floatId:string, bgColor?:string }) => {
                     let { text, floatId, bgColor=FLOATING_OBJECT_BG } = payload;
                     return add_floating_object( text, floatId, bgColor);
             });
             //
-            // 纵向移动
-            function set_floating_bottom (floatId:string, bottom:number){
-                const floatingEl = document.getElementById(floatId);
-                //
-                let tm = 200+20;
-                if (floatingEl) {
-                    setTimeout(() => {
-                        // 调整列表
-                        toasts[floatId]['bottom'] = bottom;
-                        floatingEl.style.bottom = `${bottom}px`
-                    },tm)
-                }
-            }
-            //
-            function remove_floating_object (floatId:string) {
-                const floatingEl = document.getElementById(floatId);
-                let tm = 10;
-                if (floatingEl) {
-                    setTimeout(() => {
-                        floatingEl.style.opacity = '0';
-                        // floatingEl.style.bottom = '120px';  // 向上移动
-                        floatingEl.style.right = '-120px';  // 向右收回
-                    }, tm);
-                    setTimeout(() => {
-                        floatingEl.remove();
-                    }, tm + 200);
-                    // floatingEl.remove();
-                    //
-                    toasts[floatId] = {
-                        'enabled':0,
-                    }
-                    delete toasts[floatId];
-                    //
-                    // 调整已有 toast 的纵向位置
-                    let v_min = 60;
-                    const sortedArray = Object.entries(toasts)
-                        .map(([id, item]) => ({ id, bottom: item['bottom'], height: item['height'] }))
-                        .sort((a, b) => a.bottom - b.bottom);
-                    // console.log(sortedArray);
-                    for (const { id, bottom, height } of sortedArray) {
-                        if (bottom <= v_min){
-                            const floatingEl = document.getElementById(id);
-                            let el_height = floatingEl.offsetHeight;
-                            v_min = v_min + el_height + BOTTOM_DELTA;
-                        }
-                        else if (bottom > v_min){
-                            //
-                            // 调整控件位置
-                            const floatingEl = document.getElementById(id);
-                            let el_height = floatingEl.offsetHeight;
-                            set_floating_bottom(id,v_min);
-                            //
-                            v_min = v_min + el_height + BOTTOM_DELTA;
-                        }
-                    }
-                }
-            }
+            /*
+            用法：
+            await joplin.commands.execute('editor.removeCommand', {
+                name: 'cm-addFloatingObject',
+                args: [{ floatId:'test1', ms:3000 }]
+            });
+            */
             codeMirrorWrapper.registerCommand("cm-removeFloatingObject", (floatId:string = FLOATING_OBJECT_ID) => {
                 setTimeout(() =>{
-                        remove_floating_object(floatId);
+                    remove_floating_object(floatId);
                 }, 200);  // 为了避免出现瞬间就消失
             });
             //
             /*
-            临时出现，之后消失，可用于 toast。
+            临时出现，之后自动消失的 toast。
             用法：
             await joplin.commands.execute('editor.execCommand', {
                 name: 'cm-tempFloatingObject',
                 args: [{ text: `Hello world`, floatId:'test1', ms:3000 }]
             });
             */
-            function temp_floating_object( text: string, floatId:string, 
-                bgColor:string = FLOATING_OBJECT_BG, ms: number = 2000){
-                    //
-                    let d = add_floating_object(text, floatId, bgColor);
-                    //
-                    setTimeout(() =>{
-                        remove_floating_object(floatId);
-                    }, ms);
-                    return d;
-            }
             codeMirrorWrapper.registerCommand("cm-tempFloatingObject", 
                 (payload: { text: string, floatId:string, bgColor?:string, ms?:number }) => {
                     let { text, floatId, bgColor = FLOATING_OBJECT_BG, ms = 3000 } = payload;

@@ -5,7 +5,7 @@ import { get_llm_options } from './llmConf';
 import { 
     FLOATING_HTML_BASIC, FLOATING_HTML_THINKING, FLOATING_HTML_WAITING, 
     COLOR_FLOAT, makeJumpingHtml, FloatProgressAnimator, 
-    temp_floating_object, short_folating
+    add_short_floating, get_random_floatid
  } from './pluginFloatingObject';
 import { mcp_call_tool, mcp_get_tools, mcp_get_tools_openai, get_mcp_prompt } from './mcpClient';
 
@@ -971,14 +971,14 @@ export async function llmReplyStream({
                 //     name: 'cm-tempFloatingObject',
                 //     args: [{ 
                 //         text: `Finished.`, 
-                //         floatId: String(2500+(Date.now()%500)), 
+                //         floatId: get_random_floatid(), 
                 //         ms: 2000, 
                 //         bgColor: COLOR_FLOAT.FINISH
                 //     }]
                 // });
-                await short_folating(
+                await add_short_floating(
                     `Finished.`, 
-                    String(2500+(Date.now()%500)), 
+                    get_random_floatid(), 
                     2000, 
                     COLOR_FLOAT.FINISH
                 );
@@ -1225,9 +1225,9 @@ export async function llmReplyStop() {
         //     args: [{ text: `NoteLLM force stoped!`, 
         //         floatId: 'llm_stop_1', ms: 3000, bgColor: COLOR_FLOAT.WARNING }]
         // });
-        await short_folating(
+        await add_short_floating(
             `NoteLLM force stoped!`, 
-            'llm_stop_1', 
+            get_random_floatid(), 
             3000, 
             COLOR_FLOAT.WARNING
         );
@@ -1239,9 +1239,9 @@ export async function llmReplyStop() {
         //     args: [{ text: `NoteLLM stoped.`, 
         //         floatId: 'llm_stop_0', ms: 3000, bgColor: COLOR_FLOAT.FINISH }]
         // });
-        await short_folating(
+        await add_short_floating(
             `NoteLLM stoped.`, 
-            'llm_stop_0', 
+            get_random_floatid(), 
             3000, 
             COLOR_FLOAT.FINISH
         );
@@ -1279,9 +1279,9 @@ export async function changeLLM(llm_no=0) {
     const dict_llm = await get_llm_options();
     const apiModel = dict_llm['model'];
     //
-    await short_folating(
+    await add_short_floating(
         `LLM ${int_target_llm} (${apiModel}) selected!`,
-        String(2500+(Date.now()%500)),
+        get_random_floatid(),
         3000,
         COLOR_FLOAT.SETTING
     );
@@ -1335,18 +1335,18 @@ export async function check_llm_status(show_ok=true){
 
         if (test_result == 'OK'){
             if (show_ok){
-                await short_folating(
+                await add_short_floating(
                     `LLM ${int_target_llm} Status: OK (Model = ${apiModel}) `, 
-                    String(2500+(Date.now()%500)), 
+                    get_random_floatid(), 
                     3000, 
                     COLOR_FLOAT.FINISH
                 );
             }
         }
         else {
-            await short_folating(
+            await add_short_floating(
                 `LLM ${int_target_llm} Error: ${test_result} (Model = ${apiModel}) `, 
-                String(2500+(Date.now()%500)), 
+                get_random_floatid(), 
                 4000, 
                 COLOR_FLOAT.WARNING
             );
@@ -1354,9 +1354,9 @@ export async function check_llm_status(show_ok=true){
     }
     catch (err) {
         console.error('Error in check_llm_status:', err);
-        await short_folating(
+        await add_short_floating(
             `LLM (Model = ${apiModel}) Server Connection Error: ${err}`, 
-            String(2500+(Date.now()%500)), 
+            get_random_floatid(), 
             4000, 
             COLOR_FLOAT.WARNING
         );
