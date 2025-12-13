@@ -1,6 +1,6 @@
 # Joplin Plugin: NoteLLM
 
-[中文文档](README_CN.md)
+[中文文档](README_CN.md) | [Github](https://github.com/HorseSword/joplin-plugin-notellm) | [Joplin Plugin](https://joplinapp.org/plugins/plugin/home.sword.NoteLLM)
 
 Your very own AI-powered note plugin for Joplin. 
 
@@ -30,7 +30,7 @@ New: MCP supported.
 - **MCP Supported**:
     - You can use streamableHTTP MCP tools in your note.  
 
-## Mobile Support
+## Mobile Support (Android)
 
 Currently, mobile users can enjoy the chat functionality over the entire note text. 
 
@@ -42,17 +42,37 @@ Others functions are under development.
 
 # Usage Instructions
 
-**This plugin can only work in markdown editor!!!!**
 
-**This plugin can only work in markdown editor!!!!**
 
-**This plugin can only work in markdown editor!!!!**
+## Step 1. Installation
 
-After installing this plugin, you should go to settings to configure your ai options. At least input one URL, API key, and model name.
+### Automatic
+
+- Go to `Tools > Options > Plugins`, search for `NoteLLM`, click Install plugin, 
+- Restart Joplin to enable it.
+
+### Manual
+
+- Download the "".jpl" file at [github](https://github.com/HorseSword/joplin-plugin-notellm/releases)
+- Go to `Tools > Options > Plugins`, click on the gear wheel and select `Install from file`
+- Select the ".jpl" file to install it.
+- Restart Joplin to enable it.
+
+
+
+## Step 2. Settings
+
+After installing this plugin, you should go to settings to configure your AI options. 
+
+Go to `Tools > Options > NoteLLM`.
+
+At least input one URL, API key, and model name. 
 
 You can configure up to 3 LLMs and switch among them.
 
-## Some examples for settings
+
+
+### Some examples for settings
 
 Currently, this plugin support OpenAI-API (including OpenAI compatibility APIs). Thanks to [Ian Channing](https://github.com/ianchanning).
 
@@ -71,17 +91,40 @@ Currently, this plugin support OpenAI-API (including OpenAI compatibility APIs).
 
 
 
-Then, you will have access to several features. First, a chat icon appears at the top of the markdown editing interface. Clicking on it triggers a conversation with AI based on all preceding content up to your cursor position.
+## Step 3. Use it!
+
+**This plugin can only work in markdown editor!!!!**
+
+**This plugin can only work in markdown editor!!!!**
+
+**This plugin can only work in markdown editor!!!!**
+
+The chat icon appears at the top of the markdown editing interface. Clicking on it triggers a conversation with AI based on all preceding content up to your cursor position ( Default hotkey: Alt + C ).
 
 You can also stop generation by click this button again (>= v0.6.1).
 
 ![image-20250211190649811](./_img/image-20250211190649811.png)
 
-And, in the top menu under Tools / NoteLLM, find quick access to all functions. Some have shortcut keys for easy invocation.
+And, in the top menu under Tools / NoteLLM, find quick access to all functions. 
+
+Some have shortcut keys for easy invocation.
 
 ![image-20250211190753843](./_img/image-20250211190753843.png)
 
-## MCP support !!!
+
+
+In detail,
+
+| Abilities         | No selection                                                 | You selected some texts                                      |
+| ----------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| Chat              | Chat with texts before **all above cursor**. All texts after cursor will **not** be sent to LLM. | Chat with **selection only**.                                |
+| Summarization     | Summarize **all above cursor**.                              | Summarize selected text portions efficiently.                |
+| Rewrite           | ×                                                            | Rewrite selected text. This will consider context before and after selection.  You can tell LLM how to rewrite it. |
+| Question & Answer | ×                                                            | Ask LLM about selected texts                                 |
+
+
+
+# New: MCP support !!!
 
 MCP functionality has been completely upgraded and restructured, now directly supporting streamableHTTP MCP.
 
@@ -106,6 +149,7 @@ After changing "MCP for LLM (preview)" from "OFF" to "MCP (tool call)" below LLM
 
 # Update Logs
 
+- v0.7.6, 2025-12-13. Fixed a small bug in animation when stopping LLM output.
 - v0.7.5, 2025-12-03. Significantly optimized animation effects.
 - v0.7.4, 2025-12-02. Fixed a bug in screen-scrolling.
 - v0.7.3, 2025-09-30. Fixed a bug for calling Google Gemini.
