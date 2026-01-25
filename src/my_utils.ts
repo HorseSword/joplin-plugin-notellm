@@ -1,6 +1,6 @@
 // import { getCurves } from 'crypto';  // I think, this is useless. Why here?
 import joplin from '../api';
-import { getTxt } from './texts';
+import { get_txt_by_locale } from './texts';
 import { get_llm_options } from './llmConf';
 import { 
     FLOATING_HTML_BASIC, FLOATING_HTML_THINKING, FLOATING_HTML_WAITING, 
@@ -271,7 +271,7 @@ export async function llmReplyStream({
     }) {
     //
     const locale = await joplin.settings.globalValue('locale');
-    let dictText = getTxt(locale);
+    let dictText = await get_txt_by_locale();
     //
     console.log('inp_str = ', inp_str);
     console.log('lst_msg = ', lst_msg);
@@ -405,7 +405,7 @@ export async function llmReplyStream({
     let cursor_pos:any;  // 光标位置
     //
     // head and tail
-    const HEAD_TAIL_N_CNT = 2
+    const HEAD_TAIL_ENTER_COUNT = 2
     const CHAT_HEAD = `Response from ${apiModel}:`;  // 不需要加粗
     const CHAT_TAIL = '**End of response**';
     if (flags === null){
@@ -416,10 +416,12 @@ export async function llmReplyStream({
     }
     // 打印 CHAT_HEAD
     const print_head = async () => {
-        await insert_content_move_view(`\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_N_CNT), false);
+        await insert_content_move_view(`\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_ENTER_COUNT), false);
     }
-    const print_tail = async () => {
-        await insert_content_move_view('\n'.repeat(HEAD_TAIL_N_CNT) + `${CHAT_TAIL}\n\n`, false);
+    const print_tail = async (n_enter_before = 0) => {
+        // 避免回车次数过多
+        let n_enter = n_enter_before > HEAD_TAIL_ENTER_COUNT ? 0 : HEAD_TAIL_ENTER_COUNT - n_enter_before;
+        await insert_content_move_view('\n'.repeat(n_enter) + `${CHAT_TAIL}\n\n`, false);
     }
     //
     // 文字动效参数
@@ -458,7 +460,7 @@ export async function llmReplyStream({
         if (new_text.length>0){ // 不需要 trim，因为空格或换行也是输出
             if (result_whole.length<=0){
                 if(!flags.head_printed){
-                    await joplin.commands.execute('insertText', `\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_N_CNT));
+                    await joplin.commands.execute('insertText', `\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_ENTER_COUNT));
                     flags.head_printed = true;
                 }
             }
@@ -744,13 +746,70 @@ export async function llmReplyStream({
     let fail_count = 0
     const FAIL_COUNT_MAX = 3
     let reply_type = 'unknown';  // 本次请求的类型划分（是否调用工具）
-    let is_stream_done = false;
-    let lst_tool_calls = [];
+    let is_stream_done = false;  // 标记输出完毕的标志位
+    let lst_tool_calls = [];  // 
     let force_stop = false;  // 强制退出
     //
+    let dict_res_all = {
+        "res_whole":"",
+        "res_content":"",
+        "res_tool":"",
+        "res_think":"",
+        "finist_reason":"",
+        "delta_content":"",
+        "delta_think":"",
+        "delta_tool":"",
+        "thinking_status": "not_started",
+    }
+    /**
+     * split openai-api response
+     * 
+     * 拆解AI回复文本，找到思考部分、文本部分。
+     * 
+     * @param str_parsed 
+     */
+    function res_split_stream(str_parsed:string){
+        dict_res_all['res_whole']+=str_parsed;
+        const word_think_start = '<think>';
+        const word_think_end = '</think>';
+        //
+        const METHOD_TYPE = 'METHOD_ONE'
+        //
+        if (METHOD_TYPE === 'METHOD_ONE') { // 最简单版本，找开头词语、结束词语
+            const lastOpen = dict_res_all['res_whole'].indexOf(word_think_start);
+            const lastClose = dict_res_all['res_whole'].indexOf(word_think_end);
+            //
+            if (lastOpen >= 0) { // 如果存在思考
+                if (lastClose > 0 && lastClose > lastOpen){  // 思考完成
+                    let str_think = dict_res_all['res_whole'].slice(lastOpen + word_think_start.length, lastClose);
+                    let str_content = dict_res_all['res_whole'].slice(lastClose + word_think_end.length);
+                    str_content = str_content.replace(/^\n+/g, ''); // 避免解析出来的 content 以回车开头
+                    dict_res_all['delta_think'] = str_think.startsWith(dict_res_all['res_think']) ? str_think.slice(dict_res_all['res_think'].length) : null; // 
+                    dict_res_all['res_think'] = str_think;
+                    dict_res_all['delta_content'] = str_content.startsWith(dict_res_all['res_content']) ? str_content.slice(dict_res_all['res_content'].length) : null; // 
+                    dict_res_all['res_content'] = str_content;
+                }                
+                else { // 思考中
+                    let str_think = dict_res_all['res_whole'].slice(lastOpen + word_think_start.length, lastClose);
+                    dict_res_all['delta_think'] = str_think.startsWith(dict_res_all['res_think']) ? str_think.slice(dict_res_all['res_think'].length) : null; // 
+                    dict_res_all['res_think'] = str_think;
+                }
+            }
+            else { // 一开始就没有思考的话
+                dict_res_all['res_content'] += str_parsed;
+                dict_res_all['delta_content'] = str_parsed;
+                dict_res_all['thinking_status'] = '';
+            }
+            //
+            // 避免 content 以回车开头
+            dict_res_all['res_content'] = dict_res_all['res_content'].replace(/^\n+/g, '');
+        }
+        return dict_res_all['delta_content'];
+    }
+    //
     try{  
-        const reader = llm_response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
+        const reader = llm_response.body.getReader();  //
+        const decoder = new TextDecoder('utf-8');  // 
         while (!is_stream_done) {
             // 让出控制权，用于激活外部流程
             sleep_ms(0);
@@ -781,7 +840,7 @@ export async function llmReplyStream({
                 return;
             }
             //
-            const { done, value } = await reader.read();
+            const { done, value } = await reader.read();  // 获取返回的片段
             if (done) {
                 is_stream_done = true;
                 await on_wait_end();
@@ -819,10 +878,10 @@ export async function llmReplyStream({
                     }
                     try {
                         // 解析 JSON 数据
-                        const parsed = JSON.parse(jsonString);
+                        const str_json_parsed = JSON.parse(jsonString);
                         //
-                        let new_delta = parsed.choices[0]?.delta || {};
-                        let finish_reason = parsed.choices[0]?.finish_reason || null
+                        let new_delta = str_json_parsed.choices[0]?.delta || {};
+                        let finish_reason = str_json_parsed.choices[0]?.finish_reason || null
                         //
                         // 如果尚未判定类型
                         if (reply_type == 'unknown'){  
@@ -842,26 +901,30 @@ export async function llmReplyStream({
                                 // cursor_pos = await get_cursor_pos();
                             }
                         }
-                        console.info('[875] new_delta = ', new_delta)
-                        console.info('[876] reply_type = ', reply_type);
+                        // console.info('[875] new_delta = ', new_delta)
+                        // console.info('[876] reply_type = ', reply_type);
                         //
                         //if (reply_type == 'tool_calls') {  // 如果是工具调用
                             //
-                            // 保存发来的内容
-                            if ('tool_calls' in new_delta){
-                                for (let delta_tool_calls of new_delta['tool_calls']){
-                                    lst_tool_calls.push(delta_tool_calls);
-                                }
+                        // 保存发来的内容
+                        if ('tool_calls' in new_delta){
+                            for (let delta_tool_calls of new_delta['tool_calls']){
+                                lst_tool_calls.push(delta_tool_calls);
                             }
+                        }
                         //}
                         else { //if (reply_type == 'content') {  // 如果是文本回复 (通常)
                             // 处理 content 内容
-                            let delta_content = parsed.choices[0]?.delta?.content || '';
+                            let delta_content = str_json_parsed.choices[0]?.delta?.content || '';
+                            let delta_content_result = res_split_stream(delta_content);
+                            // console.info('[909] str_json_parsed = ', str_json_parsed)
+                            // console.info('[910] delta_content_result = ', delta_content_result)
                             //
+                            // 判断思考状态，不涉及输出
                             if (thinking_status === 'not_started') {
                                 //
                                 // only when startswith <think>
-                                if (['<think>', '<THINK>'].includes(delta_content.trim())){
+                                if (['<think>', '<THINK>'].includes(delta_content.trim())){  // 判定依据是这两个关键词，有些脆弱  TODO
                                     thinking_status = 'thinking'
                                     // 
                                     // 思考期间的等待可视化
@@ -913,20 +976,29 @@ export async function llmReplyStream({
                                 // 思考已经结束，会进入这里
                             }
                             //
-                            output_str += delta_content;
+                            // 修改位置
+                            if (hide_thinking){
+                                output_str = dict_res_all['res_content'];
+                            }
+                            else {
+                                output_str = dict_res_all['res_whole'];
+                            }
                             //
                             // 避免大模型又输出一次 head。这个逻辑比较落后，之后可以考虑删除
                             if(need_add_head){
                                 if (output_str.length>10 && !output_str.trim().startsWith('**')){  // 肯定不是重复出现
+                                    // console.log('[973] output_str = ',output_str)
                                     await insert_content_move_view(output_str);
                                     need_add_head = false;
                                 }
                                 else if(output_str.length>(5 + `**${CHAT_HEAD}**`.length) ){
                                     if(output_str.trim().startsWith(`**${CHAT_HEAD}**`)){  // 
                                         output_str = output_str.replace(`**${CHAT_HEAD}**`,''); // 避免重复出现
+                                        // console.log('[980] output_str = ',output_str)
                                         await insert_content_move_view(output_str);
                                     }
                                     else{
+                                        // console.log('[983] output_str = ',output_str)
                                         await insert_content_move_view(output_str);
                                     }
                                     need_add_head = false;
@@ -934,7 +1006,15 @@ export async function llmReplyStream({
                                 fail_count = 0;
                             }
                             else{
-                                await insert_content_move_view(delta_content); // 实时更新内容
+                                if (hide_thinking){
+                                    // console.log('[990] dict_res_all = ',dict_res_all)
+                                    await insert_content_move_view(delta_content_result); // 只输出思考部分
+                                }
+                                else {
+                                    // console.log('[994] dict_res_all = ',dict_res_all)
+                                    await insert_content_move_view(delta_content);  // 输出全部生成的部分
+                                }
+                                // await insert_content_move_view(delta_content); // 实时更新内容
                             }
                         }
                     } catch (err) {
@@ -962,7 +1042,9 @@ export async function llmReplyStream({
                     flags.tail_printed = true;
                 }
                 else{  // 正常情况，由程序输出结束语
-                    await print_tail();
+                    let n_tail_match = dict_res_all['res_content'].match(/[\r\n]+$/)
+                    let n_enter_tail = n_tail_match ? n_tail_match[0].length : 0;
+                    await print_tail(n_enter_tail);
                     flags.tail_printed = true;
                 }
                 //
@@ -1212,7 +1294,7 @@ export async function llmReplyStream({
 export async function llmReplyStop() {
     //
     const locale = await joplin.settings.globalValue('locale');
-    let dictText = getTxt(locale);
+    let dictText = await get_txt_by_locale();
     // flags
     let llmSettingFlags = await joplin.settings.values(['llmFlagLlmRunning'])
     let is_running = parseInt(String(llmSettingFlags['llmFlagLlmRunning']));

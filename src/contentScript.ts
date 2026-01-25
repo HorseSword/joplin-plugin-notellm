@@ -5,7 +5,6 @@ import { StateField, StateEffect  } from "@codemirror/state";
 // import {llmReplyStream} from './my_utils';
 import {FLOATING_OBJECT_ID, FLOATING_OBJECT_BG,
     add_floating_object, remove_floating_object, temp_floating_object
-
 } from './pluginFloatingObject';
 
 
@@ -253,9 +252,10 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
             //
             // ====== LineWidget ===== ======== =========== === ========= ======== 
             //            
-            /**
-             * 单行控件
-             */
+            // 单行控件
+            //
+            // ====== LineWidget ===== ======== =========== === ========= ======== 
+            //
             // 1. 定义要插入的 Widget 的类
             class LineWidget extends WidgetType {
                 // public widgetId:string;
@@ -427,6 +427,8 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
             // ======= Floating Object ========== ================ ==================
             /////
             // 悬浮控件，用于显示提示内容
+            //
+            // ======= Floating Object ========== ================ ==================
             /*
             用法：
             await joplin.commands.execute('editor.execCommand', {

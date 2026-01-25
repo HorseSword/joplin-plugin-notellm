@@ -1,6 +1,6 @@
 import { SettingItemSubType, SettingItemType } from 'api/types';
 import joplin from '../api';
-import {getTxt} from './texts';
+import {get_txt_by_locale} from './texts';
 
 export function pluginIconName(): string {
   return 'fas fa-comments';
@@ -9,7 +9,7 @@ export function pluginIconName(): string {
 
 export async function registerSettings(): Promise<void> {
     const locale = await joplin.settings.globalValue('locale');
-    let dictText = getTxt(locale);
+    let dictText = await get_txt_by_locale();
     //
     await joplin.settings.registerSection('notellm.settings', {
       label: 'NoteLLM',
@@ -349,8 +349,8 @@ export async function registerSettings(): Promise<void> {
       llmMcpEnabled: { 
         type: SettingItemType.Int,
         value: 10,
-        label: 'Main switch for MCP', 
-        description: 'Turn ON to enable MCP, or turn OFF to disable all. \n\n Support streamableHTTP MCP servers. \n\n Reminder: STDIO and SSE are NOT supported for now, but you can load them with other tools like "Local_MCP_Manager" and convert them to streamableHTTP mode for invocation. For details, see https://github.com/horsesword/local_mcp_manager', 
+        label: dictText['mcp_main_switch'], 
+        description: dictText['mcp_main_switch_description'], 
         section: 'notellm.mcp',
         public: true,
         advanced: false,
@@ -367,7 +367,7 @@ export async function registerSettings(): Promise<void> {
       dict_settings['llmMcpEnabled_'+n_mcp] = {
         type: SettingItemType.Bool,
         value: false,
-        label: 'Enable MCP ' + n_mcp, 
+        label: dictText['mcp_enable'] + n_mcp, 
         section: 'notellm.mcp',
         public: true,
         advanced: false,
@@ -375,7 +375,7 @@ export async function registerSettings(): Promise<void> {
       dict_settings['llmMcpReminder_'+n_mcp] = {
         type: SettingItemType.String,
         value: '',
-        label: 'Name of MCP ' + n_mcp,
+        label: dictText['mcp_name_1_label'] + n_mcp,
         section: 'notellm.mcp',
         public: true,
         advanced: false,
@@ -383,7 +383,7 @@ export async function registerSettings(): Promise<void> {
       dict_settings['llmMcpServer_'+n_mcp] = {
         type: SettingItemType.String,
         value: '',
-        label: 'Server URL of MCP ' + n_mcp,
+        label: dictText['mcp_server_1_label'] + n_mcp,
         section: 'notellm.mcp',
         public: true,
         advanced: false,
@@ -391,21 +391,21 @@ export async function registerSettings(): Promise<void> {
       dict_settings['llmMcpHeaders_'+n_mcp] = {
         type: SettingItemType.String,
         value: '',
-        label: 'Custom headers for MCP ' + n_mcp,
+        label: dictText['mcp_header_1_label'] + n_mcp,
         section: 'notellm.mcp',
         public: true,
         advanced: false,
       };
       if(n<=1){
         // dict_settings['llmMcpEnabled_'+n_mcp]['description'] = '';
-        dict_settings['llmMcpReminder_'+n_mcp]['description'] = 'For noting the name of the MCP. Just name it!';
-        dict_settings['llmMcpServer_'+n_mcp]['description'] = 'Support streamableHTTP MCP servers. e.g. http://127.0.0.1:17001/mcp, https://api.githubcopilot.com/mcp/, or https://mcp.map.baidu.com/mcp?ak=xxx'
-        dict_settings['llmMcpHeaders_'+n_mcp]['description'] = 'Custom headers in JSON format, e.g. {"Authorization":"Bearer token","User-Agent":"MyApp"}'
+        dict_settings['llmMcpReminder_'+n_mcp]['description'] = dictText['mcp_name_1_description'];
+        dict_settings['llmMcpServer_'+n_mcp]['description'] = dictText['mcp_server_1_description'];
+        dict_settings['llmMcpHeaders_'+n_mcp]['description'] = dictText['mcp_header_1_description'];
       }
       else{
         // dict_settings['llmMcpReminder_'+n_mcp]['description'] = 'Just name it.';
-        dict_settings['llmMcpServer_'+n_mcp]['description'] = 'StreamableHTTP MCP servers.'
-        dict_settings['llmMcpHeaders_'+n_mcp]['description'] = 'Custom headers in JSON format.'
+        dict_settings['llmMcpServer_'+n_mcp]['description'] = dictText['mcp_name_2_description']
+        dict_settings['llmMcpHeaders_'+n_mcp]['description'] = dictText['mcp_header_2_description']
       }
       if (n>7){
         dict_settings['llmMcpEnabled_'+n_mcp]['advanced'] = true;
