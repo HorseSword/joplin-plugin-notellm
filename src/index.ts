@@ -1,7 +1,7 @@
 import joplin from 'api';
 import {ToolbarButtonLocation, ContentScriptType, MenuItemLocation } from 'api/types';
 import {registerSettings, pluginIconName } from './settings';
-import {llmReplyStream, llmReplyStop, changeLLM, check_llm_status} from './my_utils';
+import {llmReplyStream, llmReplyStop, changeLLM, check_llm_status} from './llmReplyCore';
 import {get_txt_by_locale} from './texts';
 import {mcp_call_tool, mcp_get_tools} from './mcpClient';
 import {split_note_by_selection, llm_summary, llm_ask, llm_rewrite, llm_chat} from './llmChat';

@@ -32,7 +32,7 @@ New: MCP supported.
 
 ## Mobile Support (Android)
 
-Currently, mobile users can enjoy the chat functionality over the entire note text. 
+Currently, mobile users can 'Chat' with your notes. 
 
 Others functions are under development.
 
@@ -149,6 +149,7 @@ After changing "MCP for LLM (preview)" from "OFF" to "MCP (tool call)" below LLM
 
 # Update Logs
 
+- v0.7.7, 2026-01-27. Fixed a bug in MCP calling; New 'Think format' supported. 
 - v0.7.6, 2025-12-13. Fixed a small bug in animation when stopping LLM output.
 - v0.7.5, 2025-12-03. Significantly optimized animation effects.
 - v0.7.4, 2025-12-02. Fixed a bug in screen-scrolling.

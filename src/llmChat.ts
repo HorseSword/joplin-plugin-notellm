@@ -1,5 +1,5 @@
 import joplin from 'api';
-import {llmReplyStream, llmReplyStop, changeLLM, check_llm_status} from './my_utils';
+import {llmReplyStream, llmReplyStop, changeLLM, check_llm_status} from './llmReplyCore';
 import {get_txt_by_locale} from './texts';
 
 /**

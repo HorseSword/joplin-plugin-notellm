@@ -1,4 +1,3 @@
-// import { getCurves } from 'crypto';  // I think, this is useless. Why here?
 import joplin from '../api';
 import { get_txt_by_locale } from './texts';
 import { get_llm_options } from './llmConf';
@@ -6,7 +5,7 @@ import {
     FLOATING_HTML_BASIC, FLOATING_HTML_THINKING, FLOATING_HTML_WAITING, 
     COLOR_FLOAT, makeJumpingHtml, FloatProgressAnimator, 
     add_short_floating, get_random_floatid
- } from './pluginFloatingObject';
+} from './pluginFloatingObject';
 import { mcp_call_tool, mcp_get_tools, mcp_get_tools_openai, get_mcp_prompt } from './mcpClient';
 
 // 
@@ -29,7 +28,7 @@ export async function scroll_to_view (mode:string='none') {
     }
 }
 
-function formatDateTime(date) {
+function formatDateTime(date:Date) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0'); // 月份从0开始，需+1
     const day = String(date.getDate()).padStart(2, '0');
@@ -44,6 +43,7 @@ function formatNow() {
     const now = new Date();
     return formatDateTime(now);
 }
+
 /**
  * 计算字符串 A 的尾部与字符串 B 的头部的重叠长度
  * @param strA 
@@ -252,7 +252,6 @@ export function splitTextToMessages(raw:string, remove_think:boolean=true) {
     return result;
 }
 
-
 /**
  * 流式回复的可调用函数
  * 
@@ -370,7 +369,7 @@ export async function llmReplyStream({
     // const MCP_SERVER = String(llmSettingValues['llmMcpServer']); // 读取设置
     const MCP_SERVER = mcp_servers_str;
     const MCP_HEADERS = mcp_headers_str;
-    const MAX_TOOL_CALL_ROUND = 3; // 不允许 MCP 的循环调用次数过多
+    const MAX_TOOL_CALL_ROUND = 5; // 限制最大工具循环次数，避免 MCP 的循环调用次数过多
     //
     let IS_MCP_ENABLED = (mcp_number > 0 && MCP_SERVER.trim().length > 0);
     if (IS_MCP_ENABLED) {
@@ -421,9 +420,6 @@ export async function llmReplyStream({
         let n_enter = n_enter_before > HEAD_TAIL_ENTER_COUNT ? 0 : HEAD_TAIL_ENTER_COUNT - n_enter_before;
         await insert_content_move_view('\n'.repeat(n_enter) + `${CHAT_TAIL}\n\n`, false);
     }
-    //
-    // 文字动效参数
-    const ANIMATION_INTERVAL_MS = 120;
     //
     // ===============================================================
     // 
@@ -544,13 +540,20 @@ export async function llmReplyStream({
     // ===============================================================
     // waiting 动效
     const show_waiting = true; 
-    // const waitingAnimator = new TextProgressAnimator(ANIMATION_INTERVAL_MS, show_waiting, 'Waiting'); 
-    const waitingAnimator = new FloatProgressAnimator('notellm_waiting_anim', show_waiting, FLOATING_HTML_WAITING); 
+    const waitingAnimator = new FloatProgressAnimator(
+        'notellm_waiting_anim', 
+        show_waiting, 
+        FLOATING_HTML_WAITING
+    ); 
     //
     // think 动效
     const hide_thinking = Number(dict_llm['chatSkipThink']) === 1;
-    // const thinkingAnimator = new TextProgressAnimator(ANIMATION_INTERVAL_MS, hide_thinking, 'Thinking'); 
-    const thinkingAnimator = new FloatProgressAnimator('notellm_thinking_anim', hide_thinking, FLOATING_HTML_THINKING, COLOR_FLOAT.NORMAL); 
+    const thinkingAnimator = new FloatProgressAnimator(
+        'notellm_thinking_anim', 
+        hide_thinking, 
+        FLOATING_HTML_THINKING, 
+        COLOR_FLOAT.NORMAL
+    ); 
     let thinking_status = 'not_started';
     //
     // 开始等待
@@ -605,30 +608,11 @@ export async function llmReplyStream({
     // 工具 MCP
     //
     let MCP_SERVER_URL_RESTFUL = '';
-    if (MCP_MODE == 'mcp'){
+    if (MCP_MODE === 'mcp'){
         MCP_SERVER_URL_RESTFUL = MCP_SERVER + '/mcp/get_tools'
     }
-    else if (MCP_MODE == 'agent'){
+    else if (MCP_MODE === 'agent'){
         MCP_SERVER_URL_RESTFUL = MCP_SERVER + '/mcp/get_agents'
-    }
-    async function mcp_get_tools_restful(MCP_SERVER_URL_RESTFUL:string) {
-        let openai_tools = await fetch(MCP_SERVER_URL_RESTFUL)
-            .then(mcp_response => {
-                if (!mcp_response.ok) {
-                throw new Error('MCP_网络响应失败');
-                }
-                return mcp_response.json(); // 如果返回的是 JSON 数据
-            })
-            .then(data => {
-                console.log('MCP_获取到的数据:', data); // 处理返回的数据
-                return data;
-            })
-            .catch(error => {
-                console.error('MCP_请求失败:', error);  // 服务器未启动，或者连接错误等，都会走到这里
-                // 可以添加 on_mcp_error 函数
-                return {'tools': []}  // 
-            });
-        return openai_tools;
     }
     //
     let openai_tools:any;
@@ -740,7 +724,7 @@ export async function llmReplyStream({
     // 输出解析部分 =============================
     //
     let output_str = '';
-    let need_add_head = true;
+    let flag_head_to_write = true;  // 是否需要输出开头
     let fail_count = 0
     const FAIL_COUNT_MAX = 3
     let reply_type = 'unknown';  // 本次请求的类型划分（是否调用工具）
@@ -1013,6 +997,7 @@ export async function llmReplyStream({
                             //
                         // 保存发来的内容
                         if ('tool_calls' in new_delta){
+                            console.info('[1016] new_delta = ', new_delta)
                             for (let delta_tool_calls of new_delta['tool_calls']){
                                 lst_tool_calls.push(delta_tool_calls);
                             }
@@ -1089,12 +1074,13 @@ export async function llmReplyStream({
                                 output_str = dict_res_all['res_whole'];
                             }
                             //
-                            // 避免大模型又输出一次 head。这个逻辑比较落后，之后可以考虑删除
-                            if(need_add_head){
+                            // 避免大模型又输出一次 head。
+                            // TODO：这个逻辑比较落后，之后可以考虑删除
+                            if(flag_head_to_write){
                                 if (output_str.length>10 && !output_str.trim().startsWith('**')){  // 肯定不是重复出现
                                     // console.log('[973] output_str = ',output_str)
                                     await insert_content_move_view(output_str);
-                                    need_add_head = false;
+                                    flag_head_to_write = false;
                                 }
                                 else if(output_str.length>(5 + `**${CHAT_HEAD}**`.length) ){
                                     if(output_str.trim().startsWith(`**${CHAT_HEAD}**`)){  // 
@@ -1106,20 +1092,17 @@ export async function llmReplyStream({
                                         // console.log('[983] output_str = ',output_str)
                                         await insert_content_move_view(output_str);
                                     }
-                                    need_add_head = false;
+                                    flag_head_to_write = false;
                                 }
                                 fail_count = 0;
                             }
-                            else{
+                            else { // 如果已经输出了开头
                                 if (hide_thinking){
-                                    // console.log('[990] dict_res_all = ',dict_res_all)
                                     await insert_content_move_view(delta_content_result); // 只输出思考部分
                                 }
                                 else {
-                                    // console.log('[994] dict_res_all = ',dict_res_all)
                                     await insert_content_move_view(delta_content);  // 输出全部生成的部分
                                 }
-                                // await insert_content_move_view(delta_content); // 实时更新内容
                             }
                         }
                     } catch (err) {
@@ -1138,7 +1121,7 @@ export async function llmReplyStream({
         if (reply_type == 'content') { // 收尾类型：文本回复模式
             try{
                 // 万一总长度不足导致上面没有执行；
-                if (need_add_head){ 
+                if (flag_head_to_write){ 
                     await insert_content_move_view(output_str);
                 }
                 // 防止大模型抽风，重复输出手动设定的结束语。
@@ -1177,7 +1160,7 @@ export async function llmReplyStream({
         //
         else if (reply_type == 'tool_calls') {  // 收尾类型：工具调用模式
             //
-            console.log('lst_tool_calls = ', lst_tool_calls);
+            console.log('[1180] lst_tool_calls = ', lst_tool_calls);
             //
             // 此处 stream 可能得到的是不完整的请求，需要拼接：
             let lst_tool_call_quests = [];
@@ -1203,20 +1186,22 @@ export async function llmReplyStream({
                 }
             }
             // 拼接完成后
-            console.log('lst_tool_call_quests = ', lst_tool_call_quests);
+            console.log('[1206] lst_tool_call_quests = ', lst_tool_call_quests);
             //
             // 调用工具，通过 post 请求
             let lst_tool_result = []
+            let lst_tool_result_message = []  // 
             let tool_name_cache = '';
             for (const tool_call_one of lst_tool_call_quests) {
                 let tool_result_one:any;  // 运行结果
                 tool_name_cache = tool_call_one.function.name;
+                let tool_call_id:string = tool_call_one['id'];
                 try {
                     let tool_call_name = ''
                     let json_body:string;
                     //
                     // 显示 toast
-                    if (MCP_MODE == 'agent'){
+                    if (MCP_MODE == 'agent'){ // agent mode // developing
                         tool_call_name = 'call_agents';  // 其实可以不写，但某些模型智力不够，避免弄错可以强制指定
                         // if ("agent_id" in tool_call_one.function.arguments){
                         //     console.log(tool_call_one.function.arguments)
@@ -1230,16 +1215,15 @@ export async function llmReplyStream({
                         }
                         catch(e){
                             console.log(`Line 761: ${e}`)
-                            //
                         }
                     }
-                    else {
+                    else { // normal mode
                         tool_call_name = tool_call_one.function.name
                         await on_tool_call_start(tool_call_name);
                     }
                     //
                     // 执行工具调用
-                    if(false){
+                    if (false) {  // 这个方法已经废弃
                         let MCP_RUN_URL = '';
                         MCP_RUN_URL = MCP_SERVER + '/mcp/call_tool'
                         json_body = JSON.stringify({
@@ -1269,9 +1253,11 @@ export async function llmReplyStream({
                         let tool_real_server_url = openai_map[tool_call_name]['server_url']
                         let tool_headers = openai_map[tool_call_name]['headers'] || ''
                         //
-                        console.log(`tool_real_server_url = ${tool_real_server_url}, tool_call_name = ${tool_call_name}, tool_real_name = ${tool_real_name}`)
-                        console.log('tool_call_args = ', tool_call_args)
-                        console.log('len = ', Object.keys(tool_call_args).length)
+                        console.log(`[1274] tool_real_server_url = ${tool_real_server_url}, tool_call_name = ${tool_call_name}, tool_real_name = ${tool_real_name}`)
+                        console.log('[1275] tool_call_args = ', tool_call_args)
+                        console.log('[1276] len = ', Object.keys(tool_call_args).length)
+                        console.log('[1277] tool_call_one = ', tool_call_one)
+                        //
                         let result_one:any;
                         if (Object.keys(tool_call_args).length>0){
                             result_one = await mcp_call_tool(
@@ -1289,7 +1275,7 @@ export async function llmReplyStream({
                                 tool_headers
                             )
                         }
-                        console.log('[Line 934] result_one = ',result_one)  // TODO 还需要处理错误情况
+                        console.log('[1296] result_one = ',result_one)  // TODO 还需要处理错误情况
                         if(Array.isArray(result_one)){
                             tool_result_one = result_one[0].result.content[0].text  
                         }
@@ -1300,10 +1286,15 @@ export async function llmReplyStream({
                     }
                     //
                     // 将响应结果保存到变量 a
-                    console.log('请求成功:', tool_result_one);
+                    console.log('[1307] 请求成功:', tool_result_one);
                     lst_tool_result.push(tool_result_one);
+                    lst_tool_result_message.push({
+                        'role':'tool',
+                        'tool_call_id': tool_call_id,
+                        "content": tool_result_one
+                    });
                     //
-                    if (MCP_MODE == 'agent'){
+                    if (MCP_MODE == 'agent'){  // 废弃
                         round_tool_call = MAX_TOOL_CALL_ROUND + 1;  // agent成功之后，不再调用其他 
                     }
                 } 
@@ -1314,13 +1305,13 @@ export async function llmReplyStream({
                     await on_tool_call_end(tool_call_one);
                 }
             }
-            console.log(`lst_tool_result = ${lst_tool_result}`)  // 正常工作
-            console.log(`lst_tool_result.length = ${lst_tool_result.length}`)  // 正常工作
-            console.log(`Type of lst_tool_result[0] is: ${typeof lst_tool_result[0]}`);
+            console.log(`[1326] lst_tool_result = ${lst_tool_result}`)  // 正常工作
+            console.log(`[1327] lst_tool_result.length = ${lst_tool_result.length}`)  // 正常工作
+            console.log(`[1328] Type of lst_tool_result[0] is: ${typeof lst_tool_result[0]}`);
 
             //
             // 重新运行，获取大模型回复
-            console.log(`tool_name_cache = ${tool_name_cache}`);
+            console.log(`[1332] tool_name_cache = ${tool_name_cache}`);
             //
             if (tool_name_cache == 'get_tool_groups') {  // get_tool_groups 专用于获取工具组内详情
                 let second_list_tool = []
@@ -1330,7 +1321,7 @@ export async function llmReplyStream({
                     second_list_tool = JSON.parse(lst_tool_result[0])['result']['tools']
                 }
                 catch(e){
-                    console.log(`lst_tool_result['result'] = `,lst_tool_result['result'])
+                    console.log(`[1342] lst_tool_result['result'] = `,lst_tool_result['result'])
                     second_list_tool = lst_tool_result['result']['tools']
                 }
                 //
@@ -1345,11 +1336,15 @@ export async function llmReplyStream({
             else {  // 普通的工具调用，是真的要执行功能的
                 let prompt_messages_with_tool_result = [
                     ...prompt_messages, 
-                    // {'role':'system','content':`tool_call result: ${JSON.stringify(lst_tool_result)}`}
-                    // {'role':'system','content':`<tool_result> ${lst_tool_result} </tool_result> Do not use same tool for too many times.`}
-                    {'role':'user','content':`<tool_result> ${lst_tool_result} </tool_result>`}
+                    {
+                        "role":"assistant", 
+                        "content":"tool_calls", // 应该为空，但Gemini必须传入内容，否则报错.
+                        "tool_calls":lst_tool_call_quests
+                    },
+                    ...lst_tool_result_message,
                 ];
-                console.log('prompt_messages_with_tool_result = ', prompt_messages_with_tool_result);
+                //
+                console.log('[1368] prompt_messages_with_tool_result = ', prompt_messages_with_tool_result);
                 //
                 await llmReplyStream({
                     inp_str : 'null', 
@@ -1618,4 +1613,24 @@ async function testChatCompletion(baseURL:string, apiKey:string, model:string) {
             error: error.message
         };
     }
+}
+
+async function mcp_get_tools_restful(MCP_SERVER_URL_RESTFUL:string) {
+    let openai_tools = await fetch(MCP_SERVER_URL_RESTFUL)
+        .then(mcp_response => {
+            if (!mcp_response.ok) {
+            throw new Error('MCP_网络响应失败');
+            }
+            return mcp_response.json(); // 如果返回的是 JSON 数据
+        })
+        .then(data => {
+            console.log('MCP_获取到的数据:', data); // 处理返回的数据
+            return data;
+        })
+        .catch(error => {
+            console.error('MCP_请求失败:', error);  // 服务器未启动，或者连接错误等，都会走到这里
+            // 可以添加 on_mcp_error 函数
+            return {'tools': []}  // 
+        });
+    return openai_tools;
 }
