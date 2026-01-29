@@ -80,9 +80,17 @@ function getTxt(lan='en') {
         'en':'Switch to LLM 3'
     };
     //
+    dictText['url_llm1_type_label'] = {
+        'zh_CN':'LLM1 模型服务方',
+        'en':'LLM1 Model Service Provider'
+    }
+    dictText['url_llm1_type_desc'] = {
+        'zh_CN':'请选择模型服务来源，其中 OpenAI-API-Compatible 需要在下方自定义 URL',
+        'en':'Please select the model service, among which OpenAI-API-Compatible needs to be customized below'
+    }
     dictText['url_llm1_label'] = {
-        'zh_CN':'LLM1 URL',
-        'en':'LLM server url'
+        'zh_CN':'LLM1 URL (仅 OpenAI-API-Compatible 需填写)',
+        'en':'LLM server url (only for OpenAI-API-Compatible)'
     };
     dictText['url_llm1_desc'] = {
         'zh_CN':'LLM1 的API访问网址。例如 https://api.deepseek.com/v1 或 https://dashscope.aliyuncs.com/compatible-mode/v1',
@@ -112,10 +120,18 @@ function getTxt(lan='en') {
         'zh_CN':'使用 Json 格式，例如 {"key1":"value1", "key2":"value2"}。此处的配置拥有最高优先级。',
         'en':'The 1st LLM Model extra config in json format, e.g. {"key1":"value1", "key2":"value2"}. This will cover current config by key.'
     }
-    //
+    // //
+    dictText['url_llm2_type_label'] = {
+        'zh_CN':'LLM2 模型服务方',
+        'en':'LLM2 Model Service Provider'
+    }
+    dictText['url_llm2_type_desc'] = {
+        'zh_CN':'请选择模型服务来源，其中 OpenAI-API-Compatible 需要在下方自定义 URL',
+        'en':'Please select the model service, among which OpenAI-API-Compatible needs to be customized below'
+    }
     dictText['url_llm2_label'] = {
-        'zh_CN':'LLM2 URL',
-        'en':'LLM 2 server url'
+        'zh_CN':'LLM2 URL (仅 OpenAI-API-Compatible 需填写)',
+        'en':'LLM 2 server url (only for OpenAI-API-Compatible)'
     };
     dictText['url_llm2_desc'] = {
         'zh_CN':'LLM2 的API访问网址（非必填）。',
@@ -145,10 +161,18 @@ function getTxt(lan='en') {
         'zh_CN': '使用 Json 格式，例如 {"key1":"value1", "key2":"value2"}。此处的配置拥有最高优先级。',
         'en': 'The 2nd LLM Model extra config in json format, e.g. {"key1":"value1", "key2":"value2"}. This will cover current config by key.'
     };
-    //
+    // // //
+    dictText['url_llm3_type_label'] = {
+        'zh_CN':'LLM3 模型服务方',
+        'en':'LLM3 Model Service Provider'
+    }
+    dictText['url_llm3_type_desc'] = {
+        'zh_CN':'请选择模型服务来源，其中 OpenAI-API-Compatible 需要在下方自定义 URL',
+        'en':'Please select the model service, among which OpenAI-API-Compatible needs to be customized below'
+    }
     dictText['url_llm3_label'] = {
-        'zh_CN':'LLM3 URL',
-        'en':'LLM 3 server url'
+        'zh_CN':'LLM3 URL (仅 OpenAI-API-Compatible 需填写)',
+        'en':'LLM 3 server url (only for OpenAI-API-Compatible)'
     };
     dictText['url_llm3_desc'] = {
         'zh_CN':'LLM3 的API访问网址（非必填）。',

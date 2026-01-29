@@ -1,4 +1,5 @@
 import joplin from '../api';
+import {llm_server_type_urls, llm_server_type_values} from './settings';
 
 /**
  * 用于读取大语言模型的设置参数，并以字典的形式返回。
@@ -9,9 +10,9 @@ import joplin from '../api';
 export async function get_llm_options() {
     // 读取设置的参数
     const llmSettingValues = await joplin.settings.values([
-        'llmModel','llmServerUrl','llmKey', 'llmKeyBak','llmExtra', 'llmMcp',
-        'llmModel2','llmServerUrl2','llmKey2','llmKeyBak2','llmExtra2','llmMcp2',
-        'llmModel3','llmServerUrl3','llmKey3','llmKeyBak3','llmExtra3','llmMcp3',
+        'llmModel','llmServerType','llmServerUrl','llmKey', 'llmKeyBak','llmExtra', 'llmMcp',
+        'llmModel2','llmServerType2','llmServerUrl2','llmKey2','llmKeyBak2','llmExtra2','llmMcp2',
+        'llmModel3','llmServerType3','llmServerUrl3','llmKey3','llmKeyBak3','llmExtra3','llmMcp3',
         'llmSelect',
         'llmTemperature', 'llmMaxTokens', 'llmScrollType',
         'llmChatType', 'llmChatSkipThink', 'llmChatPrompt',
@@ -21,17 +22,18 @@ export async function get_llm_options() {
     // 基础参数
     let llmSelect = parseInt(String(llmSettingValues['llmSelect']));  // 模型入口序号
     let sModel = '', sUrl = '', sKey = '', sKeyBak = '', sExtra = '', sMcp = '';
+    let sServrType = '';
     //
     if (llmSelect==2){
-        sModel = 'llmModel2'; sUrl = 'llmServerUrl2'; sKey = 'llmKey2';
+        sModel = 'llmModel2'; sServrType = 'llmServerType2', sUrl = 'llmServerUrl2'; sKey = 'llmKey2';
         sKeyBak = 'llmKeyBak2'; sExtra = 'llmExtra2'; sMcp = 'llmMcp2';
     }
     else if (llmSelect==3){
-        sModel = 'llmModel3'; sUrl = 'llmServerUrl3'; sKey = 'llmKey3';
+        sModel = 'llmModel3'; sServrType = 'llmServerType3', sUrl = 'llmServerUrl3'; sKey = 'llmKey3';
         sKeyBak = 'llmKeyBak3'; sExtra = 'llmExtra3'; sMcp = 'llmMcp3';
     }
     else {
-        sModel = 'llmModel'; sUrl = 'llmServerUrl'; sKey = 'llmKey';
+        sModel = 'llmModel'; sServrType = 'llmServerType', sUrl = 'llmServerUrl'; sKey = 'llmKey';
         sKeyBak = 'llmKeyBak'; sExtra = 'llmExtra'; sMcp = 'llmMcp';
     }
     //
@@ -39,15 +41,21 @@ export async function get_llm_options() {
     dict_llm['model'] = String(llmSettingValues[sModel]).trim();
     //
     // url and fixed urls
-    let input_url = String(llmSettingValues[sUrl])
-    if (input_url.endsWith('/chat/completions')){
-        dict_llm['url'] = input_url;
-    }
-    else if (input_url.endsWith('/')){
-        dict_llm['url'] = input_url + 'chat/completions';
+    let nLLMServerType = Number(llmSettingValues[sServrType]);
+    if (nLLMServerType > 0) {
+        dict_llm['url'] = llm_server_type_urls[llm_server_type_values[nLLMServerType]] + '/chat/completions';
     }
     else {
-        dict_llm['url'] = input_url + '/chat/completions';
+        let input_url:string = String(llmSettingValues[sUrl]);
+        if (input_url.endsWith('/chat/completions')){
+            dict_llm['url'] = input_url;
+        }
+        else if (input_url.endsWith('/')){
+            dict_llm['url'] = input_url + 'chat/completions';
+        }
+        else {
+            dict_llm['url'] = input_url + '/chat/completions';
+        }
     }
     //
     dict_llm['extra_config'] = String(llmSettingValues[sExtra]);
@@ -85,6 +93,7 @@ export async function get_llm_options() {
     dict_llm['sMcp'] = sMcp;
     dict_llm['allSettingValues'] = llmSettingValues;
     //
+    // 备份与恢复功能
     // key may disappear after updating, so backup it.
     dict_llm['key'] = await _backup_apikey_internal(llmSelect, llmSettingValues);
     //

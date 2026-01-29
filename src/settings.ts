@@ -3,8 +3,49 @@ import joplin from '../api';
 import {get_txt_by_locale} from './texts';
 
 export function pluginIconName(): string {
-  return 'fas fa-comments';
-  // return 'fas fa-robot';
+    return 'fas fa-comments';
+    // return 'fas fa-robot';
+}
+
+export const llm_server_type_values = {
+    0: 'OpenAI-API-Compatible',
+    1: 'OpenAI',
+    2: 'Authropic',
+    3: 'Google-Gemini',
+    4: 'Grok',
+    //
+    20: 'DeepSeek',
+    21: 'Dashscope(Qwen)',
+    22: 'Volcengine(Doubao)',
+    23: 'ZhiPu',
+    24: 'MiniMax',
+    25: 'Moonshot',
+    26: 'LingyiWanwu',
+    //
+    50: 'Xiaomi(MiMo)',
+    //
+    90: 'OpenRouter',
+}
+
+export const llm_server_type_urls = {
+    'OpenAI-API-Compatible': 'OpenAI-API-Compatible',
+    //
+    'OpenAI': 'https://api.openai.com/v1',
+    'Authropic': 'https://api.anthropic.com/v1',
+    'Google-Gemini': 'https://generativelanguage.googleapis.com/v1beta',
+    'Grok': 'https://api.x.ai/v1',
+    //
+    'DeepSeek': 'https://api.deepseek.com/v1',
+    'Dashscope(Qwen)': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    'Volcengine(Doubao)': 'https://ark.cn-beijing.volces.com/api/v3',
+    'ZhiPu':'https://open.bigmodel.cn/api/paas/v4',
+    'MiniMax':'https://api.minimax.chat/v1',
+    'Moonshot':'https://api.moonshot.cn/v1',
+    'LingyiWanwu':'https://api.lingyiwanwu.com/v1',
+    //
+    'Xiaomi(MiMo)': 'https://api.xiaomimimo.com/v1',
+    //
+    'OpenRouter': 'https://openrouter.ai/api/v1',
 }
 
 export async function registerSettings(): Promise<void> {
@@ -12,77 +53,88 @@ export async function registerSettings(): Promise<void> {
     let dictText = await get_txt_by_locale();
     //
     await joplin.settings.registerSection('notellm.settings', {
-      label: 'NoteLLM',
-      iconName: pluginIconName(),
+        label: 'NoteLLM',
+        iconName: pluginIconName(),
     });
     await joplin.settings.registerSection('notellm.mcp', {
-      label: 'NoteLLM MCP',
-      iconName: pluginIconName(),
+        label: 'NoteLLM MCP',
+        iconName: pluginIconName(),
     });
   
     let dict_settings = {
-      //
-      llmSelect: { 
-        type: SettingItemType.Int,
-        value: 1,
-        label: dictText['select_llm_label'], // 'LLM select',
-        description: dictText['select_llm_desc'], // 'Which LLM do you want to use?',
-        section: 'notellm.settings',
-        public: true,
-        advanced: false,
-        isEnum:true,
-        options: {
-          1: 'LLM 1',
-          2: 'LLM 2',
-          3: 'LLM 3'
-        }
+        //
+        llmSelect: { 
+            type: SettingItemType.Int,
+            value: 1,
+            label: dictText['select_llm_label'], // 'LLM select',
+            description: dictText['select_llm_desc'], // 'Which LLM do you want to use?',
+            section: 'notellm.settings',
+            public: true,
+            advanced: false,
+            isEnum:true,
+            options: {
+              1: 'LLM 1',
+              2: 'LLM 2',
+              3: 'LLM 3'
+          }
       },
       llmScrollType: { // Temperature
-        type: SettingItemType.Int,
-        value: 1,
-        label: dictText['scroll_type_label'],  // 'Scroll type',
-        description: dictText['scroll_type_desc'],  // 'Scroll type of screen while streaming.',
-        section: 'notellm.settings',
-        public: true,
-        advanced: false,
-        isEnum:true,
-        options: {
-          0: dictText['scroll_type_type0'],  // 'None',
-          1: dictText['scroll_type_type1'],  // 'Type 1: in view',
-          2: dictText['scroll_type_type2']  // 'Type 2: keep center'
-        }
+          type: SettingItemType.Int,
+          value: 1,
+          label: dictText['scroll_type_label'],  // 'Scroll type',
+          description: dictText['scroll_type_desc'],  // 'Scroll type of screen while streaming.',
+          section: 'notellm.settings',
+          public: true,
+          advanced: false,
+          isEnum:true,
+          options: {
+              0: dictText['scroll_type_type0'],  // 'None',
+              1: dictText['scroll_type_type1'],  // 'Type 1: in view',
+              2: dictText['scroll_type_type2']  // 'Type 2: keep center'
+          }
       },
       
       llmChatType: { 
-        type: SettingItemType.Int,
-        value: 2,
-        label: dictText['chat_type_label'], 
-        description: dictText['chat_type_desc'], 
-        section: 'notellm.settings',
-        public: true,
-        advanced: false,
-        isEnum:true,
-        options: {
-          1: 'ON',
-          2: 'OFF',
-        }
+          type: SettingItemType.Int,
+          value: 2,
+          label: dictText['chat_type_label'], 
+          description: dictText['chat_type_desc'], 
+          section: 'notellm.settings',
+          public: true,
+          advanced: false,
+          isEnum:true,
+          options: {
+              1: 'ON',
+              2: 'OFF',
+          }
       },
       llmChatSkipThink: { 
-        type: SettingItemType.Int,
-        value: 0,
-        label: dictText['chat_skip_think_label'], 
-        description: dictText['chat_skip_think_desc'], 
-        section: 'notellm.settings',
-        public: true,
-        advanced: false,
-        isEnum:true,
-        options: {
-          1: 'ON',
-          0: 'OFF',
-        }
+            type: SettingItemType.Int,
+            value: 0,
+            label: dictText['chat_skip_think_label'], 
+            description: dictText['chat_skip_think_desc'], 
+            section: 'notellm.settings',
+            public: true,
+            advanced: false,
+            isEnum:true,
+            options: {
+                1: 'ON',
+                0: 'OFF',
+          }
       },
       //
       // 
+      llmServerType: {
+        type: SettingItemType.Int,
+        value: 0,
+        label: dictText.url_llm1_type_label, //
+        description: dictText.url_llm1_type_desc, //
+        section: 'notellm.settings',
+        public: true,
+        advanced: false,
+        isEnum:true,
+        options: llm_server_type_values
+      },
       llmServerUrl: {
         type: SettingItemType.String,
         value: 'https://api.deepseek.com/v1',
@@ -147,6 +199,17 @@ export async function registerSettings(): Promise<void> {
         }
       },
       //
+      llmServerType2: {
+        type: SettingItemType.Int,
+        value: 0,
+        label: dictText.url_llm2_type_label, //
+        description: dictText.url_llm2_type_desc, //
+        section: 'notellm.settings',
+        public: true,
+        advanced: true,
+        isEnum:true,
+        options: llm_server_type_values
+      },
       llmServerUrl2: {
         type: SettingItemType.String,
         value: 'https://api.deepseek.com/v1',
@@ -212,6 +275,17 @@ export async function registerSettings(): Promise<void> {
       },
       //
       //
+      llmServerType3: {
+        type: SettingItemType.Int,
+        value: 0,
+        label: dictText.url_llm3_type_label, //
+        description: dictText.url_llm3_type_desc, //
+        section: 'notellm.settings',
+        public: true,
+        advanced: true,
+        isEnum:true,
+        options: llm_server_type_values
+      },
       llmServerUrl3: {
         type: SettingItemType.String,
         value: 'https://api.deepseek.com/v1',

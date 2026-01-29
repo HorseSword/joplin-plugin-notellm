@@ -751,15 +751,21 @@ export async function llmReplyStream({
      * 
      * 依赖于 外部变量 dict_res_all。
      * 
-     * @param str_delta_parsed 
+     * @param str_delta_content 
      */
-    function response_split_stream(str_delta_parsed:string){
+    function response_split_stream(str_delta_content:string, str_delta_think:string=""){
         //
-        dict_res_all['res_whole'] += str_delta_parsed;
+        dict_res_all['res_whole'] += str_delta_content;
+        //
+        if(str_delta_think.length>0){
+            dict_res_all['thinking_status'] = 'think_start';
+            dict_res_all['res_think'] += str_delta_think;
+            dict_res_all['res_think'] = str_delta_think;
+        }
         //
         const METHOD_TYPE:string = 'METHOD_2';
         //
-        if (METHOD_TYPE === 'METHOD_1') { // 最简单版本，找开头词语、结束词语
+        if (METHOD_TYPE === 'METHOD_1') { // 最简单版本，找开头词语、结束词语。测试功能正常，但较弱。
             const WORD_THINK_START = '<think>';
             const WORD_THINK_END = '</think>';
             const lastOpen = dict_res_all['res_whole'].indexOf(WORD_THINK_START);
@@ -784,8 +790,8 @@ export async function llmReplyStream({
                 }
             }
             else { // 一开始就没有思考的话
-                dict_res_all['res_content'] += str_delta_parsed;
-                dict_res_all['delta_content'] = str_delta_parsed;
+                dict_res_all['res_content'] += str_delta_content;
+                dict_res_all['delta_content'] = str_delta_content;
                 dict_res_all['thinking_status'] = 'think_end';
             }
             //
@@ -793,16 +799,18 @@ export async function llmReplyStream({
             dict_res_all['res_content'] = dict_res_all['res_content'].replace(/^\n+/g, '');
         }
         // //
-        else if (METHOD_TYPE === 'METHOD_2') { // 方法2：逐行判断
+        else if (METHOD_TYPE === 'METHOD_2') { // 方法2：逐行判断，已测试功能正常
             //
             if (dict_res_all.thinking_status === 'think_end') {
-                dict_res_all['res_content'] += str_delta_parsed;
-                if (dict_res_all['res_content'].startsWith('\n')){
-                    dict_res_all['res_content'] = dict_res_all['res_content'].trimStart();
-                    dict_res_all['delta_content'] = str_delta_parsed.trimStart();
+                // if (dict_res_all['res_content'].startsWith('\n')){
+                if (dict_res_all['res_content'].trim().length < 1 && str_delta_content.startsWith('\n')){
+                    dict_res_all['res_content'] += str_delta_content.trimStart();
+                    // dict_res_all['res_content'] = dict_res_all['res_content'].trimStart();
+                    dict_res_all['delta_content'] = str_delta_content.trimStart();
                 }
                 else {
-                    dict_res_all['delta_content'] = str_delta_parsed;
+                    dict_res_all['res_content'] += str_delta_content;
+                    dict_res_all['delta_content'] = str_delta_content;
                 }
             }
             else {
