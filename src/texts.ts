@@ -240,12 +240,12 @@ function getTxt(lan='en') {
         'en':'Num of max tokens. e.g. 1024, 2048, 4096. Too large may cause llm error.'
     };
     dictText['chat_type_label'] = {
-        'zh_CN':'聊天高级模式（测试版）',
-        'en':'Advanced Chat Mode (beta)'
+        'zh_CN':'聊天高级模式（推荐开启）',
+        'en':'Advanced Chat Mode (Recommended ON)'
     };
     dictText['chat_type_desc'] = {
         'zh_CN':'针对聊天特性优化前文解析，包括拆分对话角色、跳过推理模型 think 部分等功能。',
-        'en':'Optimize the parsing of previous text for chat features, including splitting dialogue roles, skipping the think part of the reasoning model, and other functions.'
+        'en':'Optimize the parsing of previous text for AI chat features, including splitting dialogue roles, skipping the think part of the reasoning model, and other functions.'
     };
     dictText['chat_skip_think_label'] = {
         'zh_CN':'隐藏推理模型的思考内容（测试版）',

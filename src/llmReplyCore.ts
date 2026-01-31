@@ -759,7 +759,12 @@ export async function llmReplyStream({
      * @param str_delta_content 内容部分的增量
      * @param str_delta_think 思考部分的增量
      */
-    function response_split_stream(str_delta_content:string, str_delta_think:string="", finish_reason = null){
+    function response_split_stream(chunk_line_parsed:any,){ 
+        //
+        let str_delta_content = chunk_line_parsed.choices[0]?.delta?.content || '';
+        let str_delta_think = chunk_line_parsed.choices[0]?.delta?.reasoning_content || '';
+        str_delta_think += chunk_line_parsed.choices[0]?.delta?.reasoning || '';
+        let finish_reason = chunk_line_parsed.choices[0]?.delta?.finish_reason || null;
         //
         console.log(
             '[760] str_delta_content =', str_delta_content,
@@ -1005,35 +1010,35 @@ export async function llmReplyStream({
                     // 所以拆出来的全都是完整的 data: 行
                     // 但考虑到网络传输，可能会有 data: 被中间切断，所以最稳的方法是 buffer 缓存。 TODO
                     // console.info(`chunk_line = ${data_line}`)
-                    const trimmedLine = data_line.trim();
+                    const chunk_line_trimmed = data_line.trim();
                     // 忽略空行或无效行
-                    if (!trimmedLine || !trimmedLine.startsWith('data:')) {
+                    if (!chunk_line_trimmed || !chunk_line_trimmed.startsWith('data:')) {
                         continue;
                     }
                     // 处理 "data:" 前缀
-                    const jsonString = trimmedLine.replace(/^data:/, ''); // 去掉 "data:" 前缀
+                    const chunk_line_json = chunk_line_trimmed.replace(/^data:/, ''); // 去掉 "data:" 前缀
                     // 特殊情况：处理流结束的标志 "data: [DONE]"
-                    if (jsonString.trim() === '[DONE]') {
+                    if (chunk_line_json.trim() === '[DONE]') {
                         console.info('Got [DONE]. Stream finished.');
                         is_stream_done = true;
                         break;
                     }
                     try {
                         // 解析 JSON 数据
-                        const str_json_parsed = JSON.parse(jsonString);
+                        const chunk_line_parsed = JSON.parse(chunk_line_json);
                         //
-                        let new_delta = str_json_parsed.choices[0]?.delta || {};
-                        let finish_reason = str_json_parsed.choices[0]?.finish_reason || null
+                        let choices_delta = chunk_line_parsed.choices[0]?.delta || {};
+                        let choices_finish_reason = chunk_line_parsed.choices[0]?.finish_reason || null
                         //
                         // 如果尚未判定类型
-                        if (reply_type == 'unknown'){  
+                        if (reply_type === 'unknown'){  
                             // 工具调用
-                            if (finish_reason == null){
-                                if ('tool_calls' in new_delta){ // 判定标准：如果有这个键
+                            if (choices_finish_reason === null){
+                                if ('tool_calls' in choices_delta){ // 判定标准：如果有这个键
                                     reply_type = 'tool_calls';
                                 }
                             }
-                            else if (finish_reason == 'tool_calls'){
+                            else if (choices_finish_reason === 'tool_calls'){
                                 reply_type = 'tool_calls';
                             }
                             else {
@@ -1043,32 +1048,24 @@ export async function llmReplyStream({
                                 // cursor_pos = await get_cursor_pos();
                             }
                         }
-                        // console.info('[875] new_delta = ', new_delta)
-                        // console.info('[876] reply_type = ', reply_type);
                         //
-                        //if (reply_type == 'tool_calls') {  // 如果是工具调用
-                            //
                         // 保存发来的内容
-                        if ('tool_calls' in new_delta){
-                            console.info('[1016] new_delta = ', new_delta)
-                            for (let delta_tool_calls of new_delta['tool_calls']){
-                                lst_tool_calls.push(delta_tool_calls);
+                        if ('tool_calls' in choices_delta){
+                            console.info('[1016] choices_delta = ', choices_delta)
+                            for (let tmp_tool_call of choices_delta['tool_calls']){
+                                lst_tool_calls.push(tmp_tool_call);
                             }
                         }
                         //}
                         else { //if (reply_type == 'content') {  // 如果是文本回复 (通常)
                             // 处理 content 内容
-                            let delta_content = str_json_parsed.choices[0]?.delta?.content || '';
-                            let delta_think = str_json_parsed.choices[0]?.delta?.reasoning_content || '';
-                            delta_think += str_json_parsed.choices[0]?.delta?.reasoning || '';
-                            let finish_reason = str_json_parsed.choices[0]?.delta?.reasoning || null;
-                            let delta_content_result = response_split_stream(delta_content, delta_think, finish_reason);
-                            // console.info('[909] str_json_parsed = ', str_json_parsed)
-                            // console.info('[910] delta_content_result = ', delta_content_result)
+                            let delta_content = chunk_line_parsed.choices[0]?.delta?.content || '';
+                            let delta_content_result = response_split_stream(chunk_line_parsed);
                             //
                             // 判断思考状态，不涉及输出
                             let THINK_ANI:string = 'METHOD_2';
                             if (THINK_ANI === 'METHOD_1') {
+                                /*
                                 if (thinking_status === 'not_started') {
                                     //
                                     // only when startswith <think>
@@ -1123,6 +1120,7 @@ export async function llmReplyStream({
                                 else if (thinking_status === 'think_finished') {
                                     // 思考已经结束，会进入这里
                                 }
+                                */
                             }
                             else if (THINK_ANI === 'METHOD_2') {
                                 if (dict_res_all['thinking_status'] === 'think_start'){
@@ -1141,8 +1139,7 @@ export async function llmReplyStream({
                                 output_str = dict_res_all['response_whole'];
                             }
                             //
-                            // 避免大模型又输出一次 head。
-                            // TODO：这个逻辑比较落后，之后可以考虑删除
+                            // 避免大模型又输出一次 head。// TODO：这个逻辑比较落后，之后可以考虑删除
                             if(flag_head_to_write){
                                 if (output_str.length>10 && !output_str.trim().startsWith('**')){  // 肯定不是重复出现
                                     // console.log('[973] output_str = ',output_str)
@@ -1173,7 +1170,7 @@ export async function llmReplyStream({
                             }
                         }
                     } catch (err) {
-                        console.warn('Failed to parse line:', trimmedLine, err);
+                        console.warn('Failed to parse line:', chunk_line_trimmed, err);
                         fail_count += 1;
                     }
                 }
