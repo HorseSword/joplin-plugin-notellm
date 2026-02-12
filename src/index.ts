@@ -4,7 +4,7 @@ import {registerSettings, pluginIconName } from './settings';
 import {llmReplyStream, llmReplyStop, changeLLM, check_llm_status} from './llmReplyCore';
 import {get_txt_by_locale} from './texts';
 import {mcp_call_tool, mcp_get_tools} from './mcpClient';
-import {split_note_by_selection, llm_summary, llm_ask, llm_rewrite, llm_chat} from './llmChat';
+import {split_note_by_selection, llm_summary, llm_summary_all, llm_ask, llm_rewrite, llm_chat} from './llmChat';
 
 joplin.plugins.register({
 	onStart: async function() {
@@ -58,6 +58,15 @@ joplin.plugins.register({
 			iconName: 'fas fa-robot',
 			execute: async () => {
 				await llm_summary();
+			},
+		});
+		// 摘要
+		await joplin.commands.register({
+			name: 'askLLMSummaryAll',
+			label: dictText['summary_all_label'],// 'Summarize selection (or above cursor)',
+			iconName: 'fas fa-robot',
+			execute: async () => {
+				await llm_summary_all();
 			},
 		});
 		/**
@@ -143,6 +152,11 @@ joplin.plugins.register({
 			  {
 				label: 'askLLM_Summary',
 				commandName: 'askLLMSummary', // 绑定的命令
+				// accelerator: 'Ctrl+Alt+S', // 可选快捷键
+			  },
+			  {
+				label: 'askLLM_Summary_All',
+				commandName: 'askLLMSummaryAll', // 绑定的命令
 				// accelerator: 'Ctrl+Alt+S', // 可选快捷键
 			  },
 			  {

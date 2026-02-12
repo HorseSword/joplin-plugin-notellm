@@ -6,7 +6,9 @@ import {
     COLOR_FLOAT, makeJumpingHtml, FloatProgressAnimator, 
     add_short_floating, get_random_floatid
 } from './pluginFloatingObject';
-import { mcp_call_tool, mcp_get_tools, mcp_get_tools_openai, get_mcp_prompt } from './mcpClient';
+import { 
+    mcp_call_tool, mcp_get_tools, mcp_get_tools_openai, get_mcp_prompt 
+} from './mcpClient';
 
 // 
 /**
@@ -495,9 +497,32 @@ export async function llmReplyStream({
     //
     // 构造对话列表
     let prompt_messages = [];
-    // 如果有传入的，直接使用
+    // 如果有传入的对话列表，优先直接使用。适用于 Summary, ask
     if (lst_msg.length>0){ 
         prompt_messages = lst_msg;
+        //
+        if (query_type === 'summary'){
+            // 没什么特殊的，正常执行即可
+        }
+        else if (query_type === 'summary_all'){
+            // 按要求，将光标移动到开头
+            if (String(dict_llm['summaryPosition']) === '0'){ // top most
+                console.log('[506] cursor move to topmost')
+                await joplin.commands.execute('editor.execCommand', {
+                    name: 'cm-moveCursorPosition',
+                    args: [0, true]
+                });
+                await joplin.commands.execute('insertText', '\n\n'); 
+                await joplin.commands.execute('editor.execCommand', {
+                    name: 'cm-moveCursorPosition',
+                    args: [0, true]
+                });
+                // 保存光标位置
+                cursor_pos = await joplin.commands.execute('editor.execCommand', {
+                    name: 'cm-getCursorPos' 
+                });
+            }
+        }
     }
     else{
         // 自动补充当前的时间
@@ -512,10 +537,10 @@ export async function llmReplyStream({
         // Chat message list
         if(query_type === 'chat' && chatType == 1){
             if(prompt_for_chat.trim() === ''){
-                prompt_head = dictText['prompt_chat'];
+                prompt_head = dictText['prompt_chat'];  // 默认提示词
             }
             else{
-                prompt_head = prompt_for_chat.trim();
+                prompt_head = prompt_for_chat.trim();  // 自定义提示词
             }           
         }
         prompt_messages.push({role: 'system', content: prompt_head});
@@ -527,7 +552,7 @@ export async function llmReplyStream({
         }
         prompt_messages.push({role: 'system', content: 'Response in user query language.'})
         //
-        if(query_type === 'chat' && chatType == 1){
+        if(query_type === 'chat' && chatType === 1){
             let lstSplited = splitTextToMessages(inp_str);
             prompt_messages = prompt_messages.concat(lstSplited);
             console.log(prompt_messages);
@@ -764,14 +789,14 @@ export async function llmReplyStream({
         let str_delta_content = chunk_line_parsed.choices[0]?.delta?.content || '';
         let str_delta_think = chunk_line_parsed.choices[0]?.delta?.reasoning_content || '';
         str_delta_think += chunk_line_parsed.choices[0]?.delta?.reasoning || '';
-        let finish_reason = chunk_line_parsed.choices[0]?.delta?.finish_reason || null;
+        let str_finish_reason = chunk_line_parsed.choices[0]?.delta?.finish_reason || null;
         //
-        console.log(
-            '[760] str_delta_content =', str_delta_content,
-            ', str_delta_think = ',str_delta_think,
-            ', finish_reason = ', finish_reason,
-        );
-        dict_res_all['finish_reason'] = finish_reason;
+        // console.log(
+        //     '[760] str_delta_content =', str_delta_content,
+        //     ', str_delta_think = ',str_delta_think,
+        //     ', finish_reason = ', finish_reason,
+        // );
+        dict_res_all['finish_reason'] = str_finish_reason;
         dict_res_all['response_whole'] += str_delta_content;
         str_delta_think === null ? '' : str_delta_think;
         //
@@ -805,41 +830,7 @@ export async function llmReplyStream({
         //
         const METHOD_TYPE:string = 'METHOD_2';
         //
-        if (METHOD_TYPE === 'METHOD_1') { // 最简单版本，找开头词语、结束词语。测试功能正常，但较弱。
-            const WORD_THINK_START = '<think>';
-            const WORD_THINK_END = '</think>';
-            const lastOpen = dict_res_all['response_whole'].indexOf(WORD_THINK_START);
-            const lastClose = dict_res_all['response_whole'].indexOf(WORD_THINK_END);
-            //
-            if (lastOpen >= 0) { // 如果存在思考
-                if (lastClose > 0 && lastClose > lastOpen){  // 思考完成
-                    let str_think = dict_res_all['response_whole'].slice(lastOpen + WORD_THINK_START.length, lastClose);
-                    let str_content = dict_res_all['response_whole'].slice(lastClose + WORD_THINK_END.length);
-                    str_content = str_content.replace(/^\n+/g, ''); // 避免解析出来的 content 以回车开头
-                    dict_res_all['think_delta'] = str_think.startsWith(dict_res_all['think_whole']) ? str_think.slice(dict_res_all['think_whole'].length) : ''; // 
-                    dict_res_all['think_whole'] = str_think;
-                    dict_res_all['content_delta'] = str_content.startsWith(dict_res_all['content_whole']) ? str_content.slice(dict_res_all['content_whole'].length) : null; // 
-                    dict_res_all['content_whole'] = str_content;
-                    dict_res_all['thinking_status'] = 'think_end';
-                }                
-                else { // 思考中
-                    let str_think = dict_res_all['response_whole'].slice(lastOpen + WORD_THINK_START.length, lastClose);
-                    dict_res_all['think_delta'] = str_think.startsWith(dict_res_all['think_whole']) ? str_think.slice(dict_res_all['think_whole'].length) : null; // 
-                    dict_res_all['think_whole'] = str_think;
-                    dict_res_all['thinking_status'] = 'think_start';
-                }
-            }
-            else { // 一开始就没有思考的话
-                dict_res_all['content_whole'] += str_delta_content;
-                dict_res_all['content_delta'] = str_delta_content;
-                dict_res_all['thinking_status'] = 'think_end';
-            }
-            //
-            // 避免 content 以回车开头
-            dict_res_all['content_whole'] = dict_res_all['content_whole'].replace(/^\n+/g, '');
-        }
-        // //
-        else if (METHOD_TYPE === 'METHOD_2') { // 方法2：逐行判断，已测试功能正常
+        if (METHOD_TYPE === 'METHOD_2') { // 方法2：逐行判断，已测试功能正常
             //
             // 已经在思考结束状态下
             if (dict_res_all.thinking_status === 'think_end') {
@@ -918,8 +909,14 @@ export async function llmReplyStream({
                     }
                 }
                 // 根据末尾状态，判断新增处理方式；
-                // 进入此处的条件是 进入的时候尚未处于 think_end
+                // 进入此处的条件是 
+                // 进入 response_split_stream 的时候尚未处于 think_end, 
+                // 但 在上方的 for 循环中进入了 think_end 状态，也就是遇到了结束符号。
+                //
                 if (dict_res_all.thinking_status == 'think_end') { // 不处于思考
+                    //
+                    console.log('[927] dict_res_all = ', JSON.stringify(dict_res_all, null, 4))
+                    //
                     // 找到增量的思考部分与内容部分
                     let segments_origional = dict_res_all.response_whole.split('\n');
                     let str_think:string='';
@@ -937,7 +934,7 @@ export async function llmReplyStream({
                     }
                     dict_res_all['content_delta'] = str_content.startsWith(dict_res_all['content_whole']) ? str_content.slice(dict_res_all['content_whole'].length) : ''; // 
                     dict_res_all['content_whole'] = str_content;
-                    console.log('[869] dict_res_all = ', JSON.stringify(dict_res_all, null, 2))
+                    // console.log('[869] dict_res_all = ', JSON.stringify(dict_res_all, null, 4))
                 }
                 else if (dict_res_all.thinking_status == 'think_start'){ // 结尾 thinking
                     let segments_origional = dict_res_all.response_whole.split('\n');
@@ -950,7 +947,7 @@ export async function llmReplyStream({
             }
         }
         //
-        console.log('[880] dict_res_all = ', JSON.stringify(dict_res_all, null, 2))
+        console.log('[880] dict_res_all = ', JSON.stringify(dict_res_all, null, 4))
         return dict_res_all['content_delta'];
     }
     //
@@ -1064,7 +1061,7 @@ export async function llmReplyStream({
                             //
                             // 判断思考状态，不涉及输出
                             let THINK_ANI:string = 'METHOD_2';
-                            if (THINK_ANI === 'METHOD_1') {
+                            if (THINK_ANI === 'METHOD_1') { // 已经废弃，如果新方法稳定，就彻底删除
                                 /*
                                 if (thinking_status === 'not_started') {
                                     //
@@ -1287,67 +1284,43 @@ export async function llmReplyStream({
                     }
                     //
                     // 执行工具调用
-                    if (false) {  // 这个方法已经废弃
-                        let MCP_RUN_URL = '';
-                        MCP_RUN_URL = MCP_SERVER + '/mcp/call_tool'
-                        json_body = JSON.stringify({
-                            name: tool_call_name,
-                            arguments: tool_call_one.function.arguments
-                        })
-                        console.log("json_body =", json_body)
-                        const tool_call_response = await fetch(MCP_RUN_URL, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: json_body
-                        });
-
-                        if (!tool_call_response.ok) {
-                            throw new Error('网络响应异常');
-                        }
-
-                        tool_result_one = await tool_call_response.json(); 
+                    // let mcp_url = MCP_SERVER
+                    let tool_call_args_json = tool_call_one.function.arguments
+                    let tool_call_args = JSON.parse(tool_call_args_json)
+                    let tool_real_name = openai_map[tool_call_name]['function_name']
+                    let tool_real_server_url = openai_map[tool_call_name]['server_url']
+                    let tool_headers = openai_map[tool_call_name]['headers'] || ''
+                    //
+                    console.log(`[1274] tool_real_server_url = ${tool_real_server_url}, tool_call_name = ${tool_call_name}, tool_real_name = ${tool_real_name}`)
+                    console.log('[1275] tool_call_args = ', tool_call_args)
+                    console.log('[1276] len = ', Object.keys(tool_call_args).length)
+                    console.log('[1277] tool_call_one = ', tool_call_one)
+                    //
+                    let result_one:any;
+                    if (Object.keys(tool_call_args).length>0){
+                        result_one = await mcp_call_tool(
+                            tool_real_server_url,
+                            tool_real_name, //'get_date_diff',
+                            tool_call_args, //{date_from:'2025-01-01',date_to:'2025-01-10'}
+                            tool_headers
+                        )
                     }
                     else{
-                        // let mcp_url = MCP_SERVER
-                        let tool_call_args_json = tool_call_one.function.arguments
-                        let tool_call_args = JSON.parse(tool_call_args_json)
-                        let tool_real_name = openai_map[tool_call_name]['function_name']
-                        let tool_real_server_url = openai_map[tool_call_name]['server_url']
-                        let tool_headers = openai_map[tool_call_name]['headers'] || ''
-                        //
-                        console.log(`[1274] tool_real_server_url = ${tool_real_server_url}, tool_call_name = ${tool_call_name}, tool_real_name = ${tool_real_name}`)
-                        console.log('[1275] tool_call_args = ', tool_call_args)
-                        console.log('[1276] len = ', Object.keys(tool_call_args).length)
-                        console.log('[1277] tool_call_one = ', tool_call_one)
-                        //
-                        let result_one:any;
-                        if (Object.keys(tool_call_args).length>0){
-                            result_one = await mcp_call_tool(
-                                tool_real_server_url,
-                                tool_real_name, //'get_date_diff',
-                                tool_call_args, //{date_from:'2025-01-01',date_to:'2025-01-10'}
-                                tool_headers
-                            )
-                        }
-                        else{
-                            result_one = await mcp_call_tool(
-                                tool_real_server_url,
-                                tool_real_name, //'get_date_diff',
-                                {},
-                                tool_headers
-                            )
-                        }
-                        console.log('[1296] result_one = ',result_one)  // TODO 还需要处理错误情况
-                        if(Array.isArray(result_one)){
-                            tool_result_one = result_one[0].result.content[0].text  
-                        }
-                        else{
-                            tool_result_one = result_one.result.content[0].text 
-                        }
-                        tool_result_one = `<name>${tool_call_name}</name>\n<args>${tool_call_args_json}</args>\n<result>${tool_result_one}</result>`
+                        result_one = await mcp_call_tool(
+                            tool_real_server_url,
+                            tool_real_name, //'get_date_diff',
+                            {},
+                            tool_headers
+                        )
                     }
+                    console.log('[1296] result_one = ',result_one)  // TODO 还需要处理错误情况
+                    if(Array.isArray(result_one)){
+                        tool_result_one = result_one[0].result.content[0].text  
+                    }
+                    else{
+                        tool_result_one = result_one.result.content[0].text 
+                    }
+                    tool_result_one = `<name>${tool_call_name}</name>\n<args>${tool_call_args_json}</args>\n<result>${tool_result_one}</result>`
                     //
                     // 将响应结果保存到变量 a
                     console.log('[1307] 请求成功:', tool_result_one);

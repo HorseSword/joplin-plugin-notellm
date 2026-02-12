@@ -44,6 +44,26 @@ function getTxt(lan='en') {
         'zh_CN':'生成摘要（无选中时基于光标前文，有选中时基于选中区域）',
         'en':'Summarize (above cursor or selection)'
     };
+    dictText['summary_all_label'] = {
+        'zh_CN':'全文摘要',
+        'en':'Summarize current note all'
+    };
+    dictText['summary_position_label'] = {
+        'zh_CN':'全文摘要的输出位置',
+        'en':'Location of the full text summary generation'
+    };
+    dictText['summary_position_desc'] = {
+        'zh_CN':'全文摘要可以始终在开头输出，或光标后输出。',
+        'en':'The full text summary can always be output at the beginning or after the cursor.'
+    };
+    dictText['summary_position_value0'] = {
+        'zh_CN':'笔记开头',
+        'en':'Top most'
+    };
+    dictText['summary_position_value1'] = {
+        'zh_CN':'光标后',
+        'en':'After cursor'
+    };
     dictText['chat_label'] = {
         'zh_CN':'聊天（无选中时基于光标前文，有选中时基于选中区域）',
         'en':'Chat (above cursor or selection)'

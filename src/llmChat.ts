@@ -45,8 +45,9 @@ export async function llm_summary() {
       alert('ERROR 124: ' + dictText['err_markdown']);
       return;
     }
-    if (dict_selection.is_selection_exists){
-      let prompt_messages = []
+    // 传入对话列表，直接覆盖执行
+    if (dict_selection.is_selection_exists){ // 如果对选中内容总结
+      let prompt_messages = []  
       prompt_messages.push({ role: 'system', content: dict_selection.str_selected});
       prompt_messages.push({ role: 'user', content: dictText['prompt_summary'] });
       //
@@ -57,7 +58,7 @@ export async function llm_summary() {
         is_selection_exists:true
       });
     }
-    else{
+    else{  // 对全文总结
       let prompt_messages = []
       prompt_messages.push({ role: 'system', content: dict_selection.str_before});
       prompt_messages.push({ role: 'user', content: dictText['prompt_summary'] });
@@ -74,6 +75,37 @@ export async function llm_summary() {
   }
   catch(error){
     alert(`Error 132: ${error}`);
+    console.error('Error executing command:', error);
+  }
+}
+
+export async function llm_summary_all() {
+  let dictText = await get_txt_by_locale();
+  try {
+    // 读取选中的内容：
+    let dict_selection = await split_note_by_selection();
+    // 
+    // 判断是否在markdown模式
+    if (typeof(await joplin.commands.execute('editor.execCommand', { name: 'cm-getSelectionInfo' })) === 'boolean'){
+      alert('ERROR 91: ' + dictText['err_markdown']);
+      return;
+    }
+    // 对全文总结
+    let prompt_messages = []
+    prompt_messages.push({ role: 'system', content: String(dict_selection.str_before) + String(dict_selection.str_selected) + String(dict_selection.str_after)});
+    prompt_messages.push({ role: 'user', content: dictText['prompt_summary'] });
+    //
+    await llmReplyStream({
+      inp_str:'nothing', 
+      query_type:'summary_all', 
+      lst_msg:prompt_messages,
+      is_selection_exists:true
+    });
+    // alert('Please select some text first.');
+      return;
+  }
+  catch(error){
+    alert(`Error 111: ${error}`);
     console.error('Error executing command:', error);
   }
 }

@@ -149,6 +149,7 @@ After changing "MCP for LLM (preview)" from "OFF" to "MCP (tool call)" below LLM
 
 # Update Logs
 
+- v0.7.10, 2026-02-12. New Feature: Summarize current note all.
 - v0.7.9, 2026-01-31. Fixed a bug in Thinking Animation.
 - v0.7.8, 2026-01-29. New Feature: Select Model Service Provider instead of LLM URLs. This is easier.
 - v0.7.7, 2026-01-27. Fixed a bug in MCP calling; New 'Think format' supported. 

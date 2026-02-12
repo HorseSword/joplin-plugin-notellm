@@ -15,10 +15,10 @@ export async function get_llm_options() {
         'llmModel3','llmServerType3','llmServerUrl3','llmKey3','llmKeyBak3','llmExtra3','llmMcp3',
         'llmSelect',
         'llmTemperature', 'llmMaxTokens', 'llmScrollType',
-        'llmChatType', 'llmChatSkipThink', 'llmChatPrompt',
+        'llmChatType', 'llmChatSkipThink', 'llmChatPrompt', 'llmSummaryPosition',
         // 'llmMcpServer'
     ]);
-    let dict_llm = {}
+    let dict_llm_conf = {}
     // 基础参数
     let llmSelect = parseInt(String(llmSettingValues['llmSelect']));  // 模型入口序号
     let sModel = '', sUrl = '', sKey = '', sKeyBak = '', sExtra = '', sMcp = '';
@@ -37,67 +37,68 @@ export async function get_llm_options() {
         sKeyBak = 'llmKeyBak'; sExtra = 'llmExtra'; sMcp = 'llmMcp';
     }
     //
-    dict_llm['llmSelect'] = llmSelect;
-    dict_llm['model'] = String(llmSettingValues[sModel]).trim();
+    dict_llm_conf['llmSelect'] = llmSelect;
+    dict_llm_conf['model'] = String(llmSettingValues[sModel]).trim();
     //
     // url and fixed urls
     let nLLMServerType = Number(llmSettingValues[sServrType]);
     if (nLLMServerType > 0) {
-        dict_llm['url'] = llm_server_type_urls[llm_server_type_values[nLLMServerType]] + '/chat/completions';
+        dict_llm_conf['url'] = llm_server_type_urls[llm_server_type_values[nLLMServerType]] + '/chat/completions';
     }
     else {
         let input_url:string = String(llmSettingValues[sUrl]);
         if (input_url.endsWith('/chat/completions')){
-            dict_llm['url'] = input_url;
+            dict_llm_conf['url'] = input_url;
         }
         else if (input_url.endsWith('/')){
-            dict_llm['url'] = input_url + 'chat/completions';
+            dict_llm_conf['url'] = input_url + 'chat/completions';
         }
         else {
-            dict_llm['url'] = input_url + '/chat/completions';
+            dict_llm_conf['url'] = input_url + '/chat/completions';
         }
     }
     //
-    dict_llm['extra_config'] = String(llmSettingValues[sExtra]);
-    dict_llm['mcp_number'] = Number(llmSettingValues[sMcp]);
+    dict_llm_conf['extra_config'] = String(llmSettingValues[sExtra]);
+    dict_llm_conf['mcp_number'] = Number(llmSettingValues[sMcp]);
     //
     // 添加滚动类型相关参数
-    dict_llm['scrollType'] = parseInt(String(llmSettingValues['llmScrollType']));
+    dict_llm_conf['scrollType'] = parseInt(String(llmSettingValues['llmScrollType']));
     let scroll_method = 'desktop';
-    if (dict_llm['scrollType']==1) {
+    if (dict_llm_conf['scrollType']==1) {
         scroll_method = 'desktop'
     }
-    else if (dict_llm['scrollType']==2) {
+    else if (dict_llm_conf['scrollType']==2) {
         scroll_method = 'mobile'
     }
     else {
         scroll_method = 'none'
     }
-    dict_llm['scroll_method'] = scroll_method;
+    dict_llm_conf['scroll_method'] = scroll_method;
     //
     // 添加聊天相关参数
-    dict_llm['chatType'] = parseInt(String(llmSettingValues['llmChatType']));
-    dict_llm['chatSkipThink'] = Number(llmSettingValues['llmChatSkipThink']);
-    dict_llm['chatPrompt'] = String(llmSettingValues['llmChatPrompt']);
+    dict_llm_conf['chatType'] = parseInt(String(llmSettingValues['llmChatType']));
+    dict_llm_conf['chatSkipThink'] = Number(llmSettingValues['llmChatSkipThink']);
+    dict_llm_conf['chatPrompt'] = String(llmSettingValues['llmChatPrompt']);
+    dict_llm_conf['summaryPosition'] = Number(llmSettingValues['llmSummaryPosition']);
     //
     // 添加温度和最大token参数
-    dict_llm['temperature'] = parseFloat(String(llmSettingValues['llmTemperature']));
-    dict_llm['maxTokens'] = parseInt(String(llmSettingValues['llmMaxTokens'])) ;
+    dict_llm_conf['temperature'] = parseFloat(String(llmSettingValues['llmTemperature']));
+    dict_llm_conf['maxTokens'] = parseInt(String(llmSettingValues['llmMaxTokens'])) ;
     //
     // 添加原始设置值，用于其他函数
-    dict_llm['sModel'] = sModel;
-    dict_llm['sUrl'] = sUrl;
-    dict_llm['sKey'] = sKey;
-    dict_llm['sKeyBak'] = sKeyBak;
-    dict_llm['sExtra'] = sExtra;
-    dict_llm['sMcp'] = sMcp;
-    dict_llm['allSettingValues'] = llmSettingValues;
+    dict_llm_conf['sModel'] = sModel;
+    dict_llm_conf['sUrl'] = sUrl;
+    dict_llm_conf['sKey'] = sKey;
+    dict_llm_conf['sKeyBak'] = sKeyBak;
+    dict_llm_conf['sExtra'] = sExtra;
+    dict_llm_conf['sMcp'] = sMcp;
+    dict_llm_conf['allSettingValues'] = llmSettingValues;
     //
     // 备份与恢复功能
     // key may disappear after updating, so backup it.
-    dict_llm['key'] = await _backup_apikey_internal(llmSelect, llmSettingValues);
+    dict_llm_conf['key'] = await _backup_apikey_internal(llmSelect, llmSettingValues);
     //
-    return dict_llm
+    return dict_llm_conf
 }
 
 

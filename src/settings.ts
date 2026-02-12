@@ -121,6 +121,20 @@ export async function registerSettings(): Promise<void> {
                 0: 'OFF',
             }
         },
+        llmSummaryPosition: { 
+            type: SettingItemType.Int,
+            value: 0,
+            label: dictText['summary_position_label'],  //
+            description: dictText['summary_position_desc'],  //
+            section: 'notellm.settings',
+            public: true,
+            advanced: false,
+            isEnum:true,
+            options: {
+                0: dictText['summary_position_value0'],  // top most
+                1: dictText['summary_position_value1'],  // after cursor
+            }
+        },
         //
         // 
         llmServerType: {
