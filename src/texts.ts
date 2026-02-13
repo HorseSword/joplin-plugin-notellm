@@ -137,8 +137,8 @@ function getTxt(lan='en') {
         'en':'Extra config for LLM 1 (Optional)'
     }
     dictText['extra_llm1_desc'] = {
-        'zh_CN':'使用 Json 格式，例如 {"key1":"value1", "key2":"value2"}。此处的配置拥有最高优先级。',
-        'en':'The 1st LLM Model extra config in json format, e.g. {"key1":"value1", "key2":"value2"}. This will cover current config by key.'
+        'zh_CN':'使用 Json 格式，例如 {"reasoning_effort":"medium"}。此处的配置拥有最高优先级。',
+        'en':'The 1st LLM Model extra config in json format, e.g. {"reasoning_effort":"medium"}. This will cover current config by key.'
     }
     // //
     dictText['url_llm2_type_label'] = {
@@ -178,8 +178,8 @@ function getTxt(lan='en') {
         'en': 'Extra config for LLM 2 (Optional)'
     };
     dictText['extra_llm2_desc'] = {
-        'zh_CN': '使用 Json 格式，例如 {"key1":"value1", "key2":"value2"}。此处的配置拥有最高优先级。',
-        'en': 'The 2nd LLM Model extra config in json format, e.g. {"key1":"value1", "key2":"value2"}. This will cover current config by key.'
+        'zh_CN': '使用 Json 格式，例如 {"reasoning_effort":"medium"}。此处的配置拥有最高优先级。',
+        'en': 'The 2nd LLM Model extra config in json format, e.g. {"reasoning_effort":"medium"}. This will cover current config by key.'
     };
     // // //
     dictText['url_llm3_type_label'] = {
@@ -219,8 +219,8 @@ function getTxt(lan='en') {
         'en':'Extra config for LLM 3 (Optional)'
     };
     dictText['extra_llm3_desc'] = {
-        'zh_CN':'使用 Json 格式，例如 {"key1":"value1", "key2":"value2"}。此处的配置拥有最高优先级。',
-        'en':'The 3rd LLM Model extra config in json format, e.g. {"key1":"value1", "key2":"value2"}. This will cover current config by key.'
+        'zh_CN':'使用 Json 格式，例如 {"reasoning_effort":"medium"}。此处的配置拥有最高优先级。',
+        'en':'The 3rd LLM Model extra config in json format, e.g. {"reasoning_effort":"medium"}. This will cover current config by key.'
     };
     //
     dictText['scroll_type_label'] = {
