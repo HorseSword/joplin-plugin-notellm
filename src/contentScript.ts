@@ -123,14 +123,14 @@ export default (_context: { contentScriptId: string, postMessage: any }) => {
              * 移动光标位置
              * 
              */
-            function moveCursorPosition(position, scrollIntoView=true) {
+            function moveCursorPosition(position:any, scrollIntoView=true) {
                 const view: EditorView = codeMirrorWrapper.editor;  // CodeMirror6 
                 view.dispatch({
                     selection: { anchor: position },
                     scrollIntoView: scrollIntoView // 确保光标可见
                 });
             }
-            codeMirrorWrapper.registerCommand("cm-moveCursorPosition", (position, scrollIntoView=true) => {
+            codeMirrorWrapper.registerCommand("cm-moveCursorPosition", (position:any, scrollIntoView=true) => {
                 moveCursorPosition(position, scrollIntoView);
             });
             //

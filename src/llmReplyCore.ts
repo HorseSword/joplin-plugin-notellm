@@ -309,7 +309,7 @@ export async function llmReplyStream({
     // let llmSettingValues: any = {};
     let llmSelect = 0;
     // 使用统一的参数读取函数
-    const dict_llm = await get_llm_options();
+    const dict_llm:any = await get_llm_options();
     try{
         // 提取各个参数
         apiModel = dict_llm['model'];
@@ -400,7 +400,7 @@ export async function llmReplyStream({
     //
     const START_NOTE = await joplin.workspace.selectedNote(); // 启动时的笔记
     // 
-    let result_whole = '' // 存储本次回复生成的完整文档。但好像并没有用到？
+    let result_whole = '' // 存储本次回复生成的完整文档。
     let cursor_pos:any;  // 光标位置
     //
     // head and tail
@@ -432,8 +432,9 @@ export async function llmReplyStream({
      * @param need_save 
      * @returns 
      */
-    async function insert_content_move_view (new_text: string, need_save_text = true) {
-        // 如果笔记切换了，强制退出
+    async function insert_content_move_view (new_text: string, need_save_text = true) { // 这段程序存在返回bug // TODO
+        //
+        // 如果笔记切换了，强制退出 // 这段工作正常
         let current_note = await joplin.workspace.selectedNote();
         if (current_note.id != START_NOTE.id){
             // alert('ERROR: ' + dictText['err_note_changed'])
@@ -441,39 +442,80 @@ export async function llmReplyStream({
             throw new Error('Note changed error!')
         }
         // 跳转到上次的光标位置
-        try{
-            let last_pos = cursor_pos.startLine.from + cursor_pos.startPosition.column;
-            await joplin.commands.execute('editor.execCommand', {
-                name: 'cm-moveCursorPosition',
-                args: [last_pos, false]
-            });
-        }
-        catch(e){
-            console.log(`Error = ${e}`)
+        let IS_CURSOR_POS_MOVE = true;
+        if(IS_CURSOR_POS_MOVE){
+            try{
+                let last_pos = cursor_pos.startLine.from + cursor_pos.startPosition.column;
+                await joplin.commands.execute('editor.execCommand', {
+                    name: 'cm-moveCursorPosition',
+                    args: [last_pos, false]
+                });
+            }
+            catch(e){
+                console.log(`Error = ${e}`)
+            }
         }
         //
-        // 逻辑（待验证）：首次输出之前，先输出开头 TODO
+        // 逻辑（待验证）：首次输出之前，先输出开头 // TODO
+        let tmp_cursor_pos_for_debug = await joplin.commands.execute('editor.execCommand', {
+            name: 'cm-getCursorPos' 
+        });
+        console.log('[462] tmp_cursor_pos_for_debug = ', tmp_cursor_pos_for_debug)
+        //
         if (new_text.length>0){ // 不需要 trim，因为空格或换行也是输出
             if (result_whole.length<=0){
                 if(!flags.head_printed){
-                    await joplin.commands.execute('insertText', `\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_ENTER_COUNT));
+                    await joplin.commands.execute('insertText', `\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_ENTER_COUNT) + new_text);
                     flags.head_printed = true;
+                    console.log('[464] Head printed.') // 正常
+
+                    tmp_cursor_pos_for_debug = await joplin.commands.execute('editor.execCommand', {
+                        name: 'cm-getCursorPos' 
+                    });
+                    console.log('[474] tmp_cursor_pos_for_debug = ', tmp_cursor_pos_for_debug) // 到 HEAD 后，新段落前
+                    //
+                    // 插入最新内容到笔记
+                    // await joplin.commands.execute('insertText', new_text);  // 【bug】发现问题，打印完之后，光标还是在原位置
+                    // // 似乎上面这行没有打印出东西来，就直接到下一句代码了
+                    // console.log('[480] New_text printed.')
+                }
+                else { // 仅当调用工具后再次进入打字环节时，带着 flag 才会出现 result_whole 为零但开头打印过的情况
+                    // 插入最新内容到笔记
+                    await joplin.commands.execute('insertText', new_text);  
+                    // 似乎上面这行没有打印出东西来，就直接到下一句代码了
+                    console.log('[486] New_text printed.')
                 }
             }
-            // 插入最新内容到笔记
-            await joplin.commands.execute('insertText', new_text); 
+            else { // 非开头的循环次数，会进入这里。
+                // 插入最新内容到笔记
+                await joplin.commands.execute('insertText', new_text);  
+                // 似乎上面这行没有打印出东西来，就直接到下一句代码了
+                console.log('[493] New_text printed.')
+            }
+            //
+            tmp_cursor_pos_for_debug = await joplin.commands.execute('editor.execCommand', {
+                name: 'cm-getCursorPos' 
+            });
+            console.debug('[499] tmp_cursor_pos_for_debug = ', tmp_cursor_pos_for_debug) // 需要开 all levels 才能看到
+            //
+            // 将新内容拼接到结果中
+            if (need_save_text){
+                result_whole += new_text;
+            }
+            // 滚动
+            await scroll_to_view(scroll_method);
+            //
+            // 保存最新光标位置
+            cursor_pos = await joplin.commands.execute('editor.execCommand', {
+                name: 'cm-getCursorPos' 
+            });
         }
-        // 将新内容拼接到结果中
-        if (need_save_text){
-            result_whole += new_text;
+        else { // new_text.length > 0 不成立
+            cursor_pos = await joplin.commands.execute('editor.execCommand', {
+                name: 'cm-getCursorPos' 
+            });
+            console.debug('[503] cursor_pos = ', cursor_pos)
         }
-        // 滚动
-        await scroll_to_view(scroll_method);
-        //
-        // 保存最新光标位置
-        cursor_pos = await joplin.commands.execute('editor.execCommand', {
-            name: 'cm-getCursorPos' 
-        });
     };
     //
     // 光标移动到选区最末尾
@@ -947,7 +989,7 @@ export async function llmReplyStream({
             }
         }
         //
-        console.log('[880] dict_res_all = ', JSON.stringify(dict_res_all, null, 4))
+        // console.log('[880] dict_res_all = ', JSON.stringify(dict_res_all, null, 4))
         return dict_res_all['content_delta'];
     }
     //
@@ -1136,21 +1178,22 @@ export async function llmReplyStream({
                                 output_str = dict_res_all['response_whole'];
                             }
                             //
-                            // 避免大模型又输出一次 head。// TODO：这个逻辑比较落后，之后可以考虑删除
-                            if(flag_head_to_write){
-                                if (output_str.length>10 && !output_str.trim().startsWith('**')){  // 肯定不是重复出现
-                                    // console.log('[973] output_str = ',output_str)
+                            // 避免大模型又输出一次 head。
+                            // // TODO：这个逻辑比较落后，之后可以考虑删除
+                            if(flag_head_to_write){ // 如果需要输出开头（还没输出过开头字符）
+                                if (output_str.length>5 && !output_str.trim().startsWith('**')){  // 开头不是星，说明肯定不是抄写开头
+                                    console.log('[973] output_str = ',output_str)
                                     await insert_content_move_view(output_str);
                                     flag_head_to_write = false;
                                 }
-                                else if(output_str.length>(5 + `**${CHAT_HEAD}**`.length) ){
-                                    if(output_str.trim().startsWith(`**${CHAT_HEAD}**`)){  // 
-                                        output_str = output_str.replace(`**${CHAT_HEAD}**`,''); // 避免重复出现
-                                        // console.log('[980] output_str = ',output_str)
+                                else if(output_str.length>(5 + `**${CHAT_HEAD}**`.length) ){ // 已经输出足够长的情况下
+                                    if(output_str.trim().startsWith(`**${CHAT_HEAD}**`)){  // 模型如果真的完全复写开头，
+                                        output_str = output_str.replace(`**${CHAT_HEAD}**`,''); // 替换掉，避免重复出现
+                                        console.log('[980] output_str = ',output_str)
                                         await insert_content_move_view(output_str);
                                     }
                                     else{
-                                        // console.log('[983] output_str = ',output_str)
+                                        console.log('[983] output_str = ',output_str)
                                         await insert_content_move_view(output_str);
                                     }
                                     flag_head_to_write = false;
@@ -1159,11 +1202,12 @@ export async function llmReplyStream({
                             }
                             else { // 如果已经输出了开头
                                 if (hide_thinking){
-                                    await insert_content_move_view(delta_content_result); // 只输出思考部分
+                                    await insert_content_move_view(delta_content_result); // 只输出非思考的增量部分
                                 }
                                 else {
                                     await insert_content_move_view(delta_content);  // 输出全部生成的部分
                                 }
+                                fail_count = 0;
                             }
                         }
                     } catch (err) {
