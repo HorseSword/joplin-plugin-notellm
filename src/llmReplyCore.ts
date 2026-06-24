@@ -434,6 +434,7 @@ export async function llmReplyStream({
      */
     async function insert_content_move_view (new_text: string, need_save_text = true) { // 这段程序存在返回bug // TODO
         //
+        const new_text_inner = new_text;
         // 如果笔记切换了，强制退出 // 这段工作正常
         let current_note = await joplin.workspace.selectedNote();
         if (current_note.id != START_NOTE.id){
@@ -462,10 +463,10 @@ export async function llmReplyStream({
         });
         console.log('[462] tmp_cursor_pos_for_debug = ', tmp_cursor_pos_for_debug)
         //
-        if (new_text.length>0){ // 不需要 trim，因为空格或换行也是输出
+        if (new_text_inner.length>0){ // 不需要 trim，因为空格或换行也是输出
             if (result_whole.length<=0){
                 if(!flags.head_printed){
-                    await joplin.commands.execute('insertText', `\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_ENTER_COUNT) + new_text);
+                    await joplin.commands.execute('insertText', `\n\n**${CHAT_HEAD}**`+'\n'.repeat(HEAD_TAIL_ENTER_COUNT) + new_text_inner);
                     flags.head_printed = true;
                     console.log('[464] Head printed.') // 正常
 
@@ -475,22 +476,22 @@ export async function llmReplyStream({
                     console.log('[474] tmp_cursor_pos_for_debug = ', tmp_cursor_pos_for_debug) // 到 HEAD 后，新段落前
                     //
                     // 插入最新内容到笔记
-                    // await joplin.commands.execute('insertText', new_text);  // 【bug】发现问题，打印完之后，光标还是在原位置
+                    // await joplin.commands.execute('insertText', new_text_inner);  // 【bug】发现问题，打印完之后，光标还是在原位置
                     // // 似乎上面这行没有打印出东西来，就直接到下一句代码了
-                    // console.log('[480] New_text printed.')
+                    // console.log('[480] new_text_inner printed.')
                 }
                 else { // 仅当调用工具后再次进入打字环节时，带着 flag 才会出现 result_whole 为零但开头打印过的情况
                     // 插入最新内容到笔记
-                    await joplin.commands.execute('insertText', new_text);  
+                    await joplin.commands.execute('insertText', new_text_inner);  
                     // 似乎上面这行没有打印出东西来，就直接到下一句代码了
-                    console.log('[486] New_text printed.')
+                    console.log('[486] new_text_inner printed.')
                 }
             }
             else { // 非开头的循环次数，会进入这里。
                 // 插入最新内容到笔记
-                await joplin.commands.execute('insertText', new_text);  
+                await joplin.commands.execute('insertText', new_text_inner);  
                 // 似乎上面这行没有打印出东西来，就直接到下一句代码了
-                console.log('[493] New_text printed.')
+                console.log('[493] new_text_inner printed.')
             }
             //
             tmp_cursor_pos_for_debug = await joplin.commands.execute('editor.execCommand', {
@@ -500,7 +501,7 @@ export async function llmReplyStream({
             //
             // 将新内容拼接到结果中
             if (need_save_text){
-                result_whole += new_text;
+                result_whole += new_text_inner;
             }
             // 滚动
             await scroll_to_view(scroll_method);
@@ -510,7 +511,7 @@ export async function llmReplyStream({
                 name: 'cm-getCursorPos' 
             });
         }
-        else { // new_text.length > 0 不成立
+        else { // new_text_inner.length > 0 不成立
             cursor_pos = await joplin.commands.execute('editor.execCommand', {
                 name: 'cm-getCursorPos' 
             });
