@@ -149,6 +149,7 @@ After changing "MCP for LLM (preview)" from "OFF" to "MCP (tool call)" below LLM
 
 # Update Logs
 
+- v0.7.12 (preview), 2026-07-12. Attempt to fix a bug where some OpenAI API servers return responses containing the "tool_calls" key even when no tools are invoked, leading to false detection of tool calls and causing infinite waiting.
 - v0.7.11, 2026-06-24. Bug fixed: Cursor sometimes may return back unexpectedly.
 - v0.7.10, 2026-02-12. New Feature: Summarize current note all.
 - v0.7.9, 2026-01-31. Fixed a bug in Thinking Animation.

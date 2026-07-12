@@ -822,7 +822,7 @@ export async function llmReplyStream({
      * 
      * split openai-api response
      * 
-     * 依赖于 外部变量 dict_res_all。
+     * 依赖于 外部变量 dict_res_all
      * 
      * @param str_delta_content 内容部分的增量
      * @param str_delta_think 思考部分的增量
@@ -1074,8 +1074,16 @@ export async function llmReplyStream({
                         if (reply_type === 'unknown'){  
                             // 工具调用
                             if (choices_finish_reason === null){
-                                if ('tool_calls' in choices_delta){ // 判定标准：如果有这个键
-                                    reply_type = 'tool_calls';
+                                if ('tool_calls' in choices_delta){ // 判定标准：如果有这个键 # TODO 需要修复: 有些服务器不调用工具的时候，也会带 tool_calls
+                                    console.info('[1078]',choices_delta);
+                                    try{
+                                        if(choices_delta['tool_calls'].length>0){
+                                            reply_type = 'tool_calls';
+                                        }
+                                    }
+                                    catch{
+                                        //
+                                    } 
                                 }
                             }
                             else if (choices_finish_reason === 'tool_calls'){
@@ -1090,7 +1098,7 @@ export async function llmReplyStream({
                         }
                         //
                         // 保存发来的内容
-                        if ('tool_calls' in choices_delta){
+                        if (reply_type === 'tool_calls'){ //('tool_calls' in choices_delta){
                             console.info('[1016] choices_delta = ', choices_delta)
                             for (let tmp_tool_call of choices_delta['tool_calls']){
                                 lst_tool_calls.push(tmp_tool_call);
@@ -1104,63 +1112,8 @@ export async function llmReplyStream({
                             //
                             // 判断思考状态，不涉及输出
                             let THINK_ANI:string = 'METHOD_2';
-                            if (THINK_ANI === 'METHOD_1') { // 已经废弃，如果新方法稳定，就彻底删除
-                                /*
-                                if (thinking_status === 'not_started') {
-                                    //
-                                    // only when startswith <think>
-                                    if (['<think>', '<THINK>'].includes(delta_content.trim())){  // 判定依据是这两个关键词，有些脆弱  TODO
-                                        thinking_status = 'thinking'
-                                        // 
-                                        // 思考期间的等待可视化
-                                        if (hide_thinking){
-                                            await on_think_start();
-                                            continue;
-                                        }
-                                    }
-                                    else if (delta_content.trim().startsWith('<think>')) {
-                                        // 特例：工具调用等情况下，直接将完整版发来了，也属于这种情况
-                                        const endIndex = delta_content.indexOf('</think>');
-                                        if (endIndex !== -1){
-                                            if (hide_thinking){
-                                                delta_content = delta_content.trim().replace(/^<think>[\s\S]*?<\/think>\n\n/, '');
-                                                thinking_status = 'think_finished';
-                                            }
-                                        }
-                                    }
-                                    else{
-                                        // 如果不是 <think> 开头，说明不是推理模式，直接跳过
-                                        // 特例：工具调用等情况下，直接将完整版发来了，也属于这种情况
-                                        thinking_status = 'think_finished';
-                                    }
-                                }
-                                else if(thinking_status === 'thinking') {  // 如果已经在思考中了
-                                    if (['</think>', '</THINK>'].includes(delta_content.trim())){  // 结束思考的标志
-                                        thinking_status = 'think_ends';
-                                        await on_think_end();
-                                    }
-                                    if (hide_thinking){
-                                        continue;
-                                    }
-                                } 
-                                else if (thinking_status === 'think_ends'){
-                                    if(delta_content.trim() === ''){
-                                        if (hide_thinking){
-                                            continue;
-                                        }
-                                    }
-                                    else if (delta_content.trim().length > 0){
-                                        thinking_status = 'think_finished';
-                                        await on_think_end();
-                                        if (hide_thinking){
-                                            delta_content = delta_content.trim();
-                                        }
-                                    }
-                                }
-                                else if (thinking_status === 'think_finished') {
-                                    // 思考已经结束，会进入这里
-                                }
-                                */
+                            if (THINK_ANI === 'METHOD_1') { 
+                                // 已经废弃，如果新方法稳定，就彻底删除
                             }
                             else if (THINK_ANI === 'METHOD_2') {
                                 if (dict_res_all['thinking_status'] === 'think_start'){
